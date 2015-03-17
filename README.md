@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Grime is based on conjunctive grammars.
+Grime is a two-dimensional pattern matching language based on Boolean grammars.
 The basic idea is to construct rectangular patterns from smaller components, and check whether they are found in the input matrix.
 
 ## Usage
