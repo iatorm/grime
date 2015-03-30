@@ -1,6 +1,7 @@
 -- A two-dimensional language based on conjunctive grammars
 
 import Prelude hiding (lookup)
+import Data.List (nub)
 import Data.Map.Strict (Map, empty, lookup, insert, fromList, toList)
 import Data.Set (Set, member, singleton, fromAscList, toAscList)
 import Control.Monad (forM, forM_, liftM2, (>=>), filterM, when)
@@ -19,18 +20,18 @@ type Size = (Int, Int) -- w, h
 type Rect = (Int, Int, Int, Int) -- x, y, w, h
 
 -- An expression that may or may not match a rectangle of characters
-data Expr = Empty -- Mathces a 0xn or nx0 rectangle
-          | Border -- Matches the rectangle border symbol
-          | AnyChar -- Matches any single character (not border)
+data Expr = Empty               -- Mathces a 0xn or nx0 rectangle
+          | Border              -- Matches the rectangle border symbol
+          | AnyChar             -- Matches any single character (not border)
           | SomeChar (Set Char) -- Matches any of the given characters
-          | Var Label -- Matches the given variable
-          | Expr :> Expr -- Horizontal concatenation
-          | HPlus Expr -- Horizontal repetition
-          | Expr :^ Expr -- Vertical concatenation
-          | VPlus Expr -- Vertical repetition
-          | Expr :| Expr -- Disjunction
-          | Expr :& Expr -- Conjunction
-          | Not Expr -- Negation
+          | Var Label           -- Matches the given variable
+          | Expr :> Expr        -- Horizontal concatenation
+          | HPlus Expr          -- Horizontal repetition
+          | Expr :^ Expr        -- Vertical concatenation
+          | VPlus Expr          -- Vertical repetition
+          | Expr :| Expr        -- Disjunction
+          | Expr :& Expr        -- Conjunction
+          | Not Expr            -- Negation
 
 instance Show Expr where
   show Empty = "_"
@@ -84,7 +85,7 @@ pExpr = buildExpressionParser opTable term <?> "expression"
 
 -- File parser
 pLines :: String -> Either ParseError (Map Label Expr)
-pLines s = fmap fromList . mapM parseEq $ lines s
+pLines s = fmap fromList . mapM parseEq . map (reverse . takeWhile (/= '`') . reverse) $ lines s
   where parseEq e@('\\':'=':_) = do
           expr <- parse pExpr "" e
           return ("", expr)
@@ -191,10 +192,13 @@ submatrix (x, y, w, h) = unlines . take h . drop y . map (take w . drop x) . lin
 main :: IO ()
 main = do
   args <- getArgs
-  let (opts, grFile, matFile) = case args of
+  let (cmdOpts, grFile, matFile) = case args of
         ['-':a, b, c] -> (a, b, c)
         [a, b] -> ("", a, b)
-  parsedGrammar <- fmap pLines $ readFile grFile
+  grammar <- readFile grFile
+  let parsedGrammar = pLines grammar
+      fileOpts = takeWhile (/= '\n') . reverse . takeWhile (/= '`') $ grammar
+      opts = [o | o <- nub $ cmdOpts ++ fileOpts, elem o cmdOpts /= elem o fileOpts]
   case parsedGrammar of
     Left error -> print error
     Right grammar -> do
@@ -208,6 +212,7 @@ main = do
                          x <- [-1..wMat], y <- [-1..hMat],
                          w <- [0..wMat+1-x], h <- [0..hMat+1-y]]
       when (elem 'd' opts) $ do
+        putStrLn opts
         print sze
         forM_ (toList grammar) $ \(l, e) ->
           putStrLn $ (if l==[] then "Pat = " else l ++ " = ") ++ show e

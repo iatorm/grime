@@ -26,6 +26,8 @@ By default, the interpreter prints the first match it finds, but this can be con
 - `-s`: do not print the matches themselves.
 - `-d`: print debug information.
 
+These can be inserted from the command line, or in the beginning of any line of a grammar file, separated from the rest of the line by a backtick.
+
 ## Syntax and Semantics
 
 A Grime grammar consists of one or more _definitions_, each on a separate line.
