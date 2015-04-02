@@ -1,4 +1,4 @@
--- A two-dimensional language based on conjunctive grammars
+-- A two-dimensional language based on Boolean grammars
 
 import Prelude hiding (lookup)
 import Data.List (nub)
@@ -7,13 +7,13 @@ import Data.Set (Set, member, singleton, fromAscList, toAscList)
 import Control.Monad (forM, forM_, liftM2, (>=>), filterM, when)
 import Control.Monad.Trans.Reader (ReaderT, asks, runReaderT)
 import Control.Monad.State.Lazy (State, gets, modify, evalState)
-import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between)
-import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string)
+import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, many1)
+import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, lower)
 import Text.Parsec.Expr
 import System.Environment (getArgs)
 
 -- The label of a variable
-type Label = String
+type Label = Maybe Char
 
 type Coord = (Int, Int) -- x, y
 type Size = (Int, Int) -- w, h
@@ -38,7 +38,8 @@ instance Show Expr where
   show Border = "$"
   show AnyChar = "."
   show (SomeChar set) = "[" ++ toAscList set ++ "]"
-  show (Var label) = label
+  show (Var Nothing) = ""
+  show (Var (Just a)) = [a]
   show (e1 :> e2) = show e1 ++ show e2
   show (HPlus e) = "(" ++ show e ++ ")+"
   show (e1 :^ e2) = "(" ++ show e1 ++ "/" ++ show e2 ++ ")"
@@ -67,7 +68,7 @@ pExpr = buildExpressionParser opTable term <?> "expression"
             'a' -> SomeChar . fromAscList $ ['A'..'Z'] ++ ['a'..'z']
             'n' -> SomeChar . fromAscList $ ['0'..'9'] ++ ['A'..'Z'] ++ ['a'..'z']
             's' -> SomeChar . fromAscList $ ['!'..'/'] ++ [':'..'@'] ++ ['['..'`'] ++ ['{'..'~']
-            _ -> Var [c]
+            _ -> Var $ Just c
         parens = char '(' `between` char ')'
         opTable = [[Postfix (char '?' >> return (Empty :|))],
                    [Postfix (char '+' >> return HPlus)],
@@ -83,18 +84,23 @@ pExpr = buildExpressionParser opTable term <?> "expression"
         contains expr = rect :^ (rect :> expr :> rect) :^ rect
           where rect = Empty :| (HPlus $ VPlus AnyChar)
 
+
 -- File parser
-pLines :: String -> Either ParseError (Map Label Expr)
-pLines s = fmap fromList . mapM parseEq . map (reverse . takeWhile (/= '`') . reverse) $ lines s
-  where parseEq e@('\\':'=':_) = do
-          expr <- parse pExpr "" e
-          return ("", expr)
-        parseEq (l:'=':e) = do
-          expr <- parse pExpr "" e
-          return ([l], expr)
-        parseEq e = do
-          expr <- parse pExpr "" e
-          return ("", expr)
+pLines :: String -> Either ParseError (String, Map Label Expr)
+pLines = fmap foldTuples . mapM (parse pLine "") . lines
+  where foldTuples = foldr (\(a,(b1,b2)) (c,d) -> (a++c, insert b1 b2 d)) ("", empty)
+        pLine = try parseOptionLine <|> fmap (\e -> ("", e)) parseLine
+        parseOptionLine = do
+          os <- many $ oneOf "enapsd"
+          char '`'
+          e <- parseLine
+          return (os, e)
+        parseLine = try parseDef <|> fmap (\e -> (Nothing, e)) pExpr
+        parseDef = do
+          label <- upper
+          char '='
+          e <- pExpr
+          return (Just label, e)
   
 -- An unchanging context for matching in a matrix
 data Context = Context {size :: Size,
@@ -179,10 +185,10 @@ matches (Not expr) rect = fmap not $ matches expr rect
 
 
 
--- Collect matches of "" for the given rectangles.
+-- Collect matches of Nothing for the given rectangles.
 matchAllEmpty :: Context -> [Rect] -> [Rect]
 matchAllEmpty con rects = flip evalState empty . flip runReaderT con $ do
-  Just expr <- asks $ lookup "" . clauses
+  Just expr <- asks $ lookup Nothing . clauses
   filterM (matches expr) rects
 
 -- Take a submatrix of a newline-delimited string
@@ -195,15 +201,13 @@ main = do
   let (cmdOpts, grFile, matFile) = case args of
         ['-':a, b, c] -> (a, b, c)
         [a, b] -> ("", a, b)
-  grammar <- readFile grFile
-  let parsedGrammar = pLines grammar
-      fileOpts = takeWhile (/= '\n') . reverse . takeWhile (/= '`') $ grammar
-      opts = [o | o <- nub $ cmdOpts ++ fileOpts, elem o cmdOpts /= elem o fileOpts]
+  parsedGrammar <- fmap pLines $ readFile grFile
   case parsedGrammar of
     Left error -> print error
-    Right grammar -> do
+    Right (fileOpts, grammar) -> do
       pict <- readFile matFile
-      let (sze@(wMat, hMat), mat) = mkMatrix pict
+      let opts = [o | o <- nub $ cmdOpts ++ fileOpts, elem o cmdOpts /= elem o fileOpts]
+          (sze@(wMat, hMat), mat) = mkMatrix pict
           matches = (if elem 'a' opts || elem 'n' opts then id else take 1) .
                     matchAllEmpty (Context sze mat grammar) $
                    if elem 'e' opts
@@ -215,7 +219,7 @@ main = do
         putStrLn opts
         print sze
         forM_ (toList grammar) $ \(l, e) ->
-          putStrLn $ (if l==[] then "Pat = " else l ++ " = ") ++ show e
+          putStrLn $ (case l of Nothing -> "Pat = "; Just a -> a:" = ") ++ show e
       if (elem 'n' opts /= elem 'e' opts)
         then print $ length matches
         else forM_ matches $ \rect -> do
