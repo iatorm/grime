@@ -55,8 +55,3 @@ Grime does allow paradoxical definitions of the form `A=A!` with undefined behav
 However, they will not cause crashes or infinite loops.
 
 Grime supports non-rectangular inputs; the rows are simple aligned to the left, and the gaps can be matched using `$`.
-
-My parser is not as smart as I would like it to be.
-In particular, it cannot handle espressions of the type `A#!`, so I have to insert parentheses: `(A#)!`.
-This can be seen in the chessboard examples.
-Use the debug flag to check your expressions, if you notice anything strange.
