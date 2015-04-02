@@ -1,13 +1,13 @@
 -- A two-dimensional language based on Boolean grammars
 
 import Prelude hiding (lookup)
-import Data.List (nub)
+import Data.List (nub, (\\), sort)
 import Data.Map.Strict (Map, empty, lookup, insert, fromList, toList)
 import Data.Set (Set, member, singleton, fromAscList, toAscList)
 import Control.Monad (forM, forM_, liftM2, (>=>), filterM, when)
 import Control.Monad.Trans.Reader (ReaderT, asks, runReaderT)
 import Control.Monad.State.Lazy (State, gets, modify, evalState)
-import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, many1)
+import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe)
 import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, lower)
 import Text.Parsec.Expr
 import System.Environment (getArgs)
@@ -48,39 +48,58 @@ instance Show Expr where
   show (e1 :& e2) = "(" ++ show e1 ++ "&" ++ show e2 ++ ")"
   show (Not e) = "(" ++ show e ++ ")!"
 
+mkSomeChar :: String -> Expr
+mkSomeChar = SomeChar . fromAscList . sort
+
 -- Expression parser
 pExpr :: Parsec String () Expr
 pExpr = buildExpressionParser opTable term <?> "expression"
-  where term = try (parens pExpr) <|> try escaped <|> reserved <?> "term"
+  where term = try (parens pExpr) <|> try escaped <|> try charClass <|> reserved <?> "term"
         escaped = do
           char '\\'
           c <- anyChar
-          return $ SomeChar $ singleton c
+          return $ mkSomeChar [c]
         reserved = do
           c <- oneOf ("_$.dulans" ++ ['A'..'Z'])
           return $ case c of
             '_' -> Empty
             '$' -> Border
             '.' -> AnyChar
-            'd' -> SomeChar $ fromAscList ['0'..'9']
-            'u' -> SomeChar $ fromAscList ['A'..'Z']
-            'l' -> SomeChar $ fromAscList ['a'..'z']
-            'a' -> SomeChar . fromAscList $ ['A'..'Z'] ++ ['a'..'z']
-            'n' -> SomeChar . fromAscList $ ['0'..'9'] ++ ['A'..'Z'] ++ ['a'..'z']
-            's' -> SomeChar . fromAscList $ ['!'..'/'] ++ [':'..'@'] ++ ['['..'`'] ++ ['{'..'~']
+            'd' -> mkSomeChar ['0'..'9']
+            'u' -> mkSomeChar ['A'..'Z']
+            'l' -> mkSomeChar ['a'..'z']
+            'a' -> mkSomeChar $ ['A'..'Z'] ++ ['a'..'z']
+            'n' -> mkSomeChar $ ['0'..'9'] ++ ['A'..'Z'] ++ ['a'..'z']
+            's' -> mkSomeChar $ ['!'..'/'] ++ [':'..'@'] ++ ['['..'`'] ++ ['{'..'~']
             _ -> Var $ Just c
         parens = char '(' `between` char ')'
-        opTable = [[Postfix (char '?' >> return (Empty :|))],
-                   [Postfix (char '+' >> return HPlus)],
-                   [Postfix (char '*' >> return (\e -> Empty :| HPlus e))],
-                   [Postfix (try (string "/+") >> return VPlus)],
-                   [Postfix (try (string "/*") >> return (\e -> Empty :| VPlus e))],
-                   [Postfix (char '!' >> return Not)],
-                   [Postfix (char '#' >> return contains)],
+        classLetter = noneOf "[]-,\\" <|> (char '\\' >> oneOf "[]-,\\")
+        classRange = do
+          a <- classLetter
+          char '-'
+          b <- classLetter
+          return [a..b]
+        charClass = between (char '[') (char ']') $ do
+          pos <- many $ try classRange <|> fmap (:[])classLetter
+          neg <- optionMaybe $ char ',' >> (many $ try classRange <|> fmap (:[]) classLetter)
+          return $ case (null pos, neg) of
+            (True, Nothing) -> AnyChar
+            (False, Nothing) -> mkSomeChar $ concat pos
+            (True, Just negs) -> AnyChar :& (Not . mkSomeChar $ concat negs)
+            (False, Just negs) -> mkSomeChar $ concat pos \\ concat negs
+        opTable = [[Postfix postfix],
                    [Infix (return (:>)) AssocLeft],
                    [Infix (char '/' >> return (:^)) AssocLeft],
                    [Infix (char '&' >> return (:&)) AssocLeft],
                    [Infix (char '|' >> return (:|)) AssocLeft]]
+        postfix = fmap (foldr1 (.) . reverse) . many1 . choice . map try $
+          [char '?' >> return (Empty :|),
+           char '+' >> return HPlus,
+           char '*' >> return (\e -> Empty :| HPlus e),
+           string "/+" >> return VPlus,
+           string "/*" >> return (\e -> Empty :| VPlus e),
+           char '!' >> return Not,
+           char '#' >> return contains]
         contains expr = rect :^ (rect :> expr :> rect) :^ rect
           where rect = Empty :| (HPlus $ VPlus AnyChar)
 
@@ -91,8 +110,7 @@ pLines = fmap foldTuples . mapM (parse pLine "") . lines
   where foldTuples = foldr (\(a,(b1,b2)) (c,d) -> (a++c, insert b1 b2 d)) ("", empty)
         pLine = try parseOptionLine <|> fmap (\e -> ("", e)) parseLine
         parseOptionLine = do
-          os <- many $ oneOf "enapsd"
-          char '`'
+          os <- oneOf "enapsd" `manyTill` char ','
           e <- parseLine
           return (os, e)
         parseLine = try parseDef <|> fmap (\e -> (Nothing, e)) pExpr
