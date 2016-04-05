@@ -133,7 +133,7 @@ pLines = fmap foldTuples . mapM (parse pLine "") . lines
   where foldTuples = foldr (\(a,(b1,b2)) (c,d) -> (a++c, insert b1 b2 d)) ("", empty)
         pLine = try parseOptionLine <|> fmap (\e -> ("", e)) parseLine
         parseOptionLine = do
-          os <- oneOf "enapsd" `manyTill` char ','
+          os <- oneOf "enapsd" `manyTill` char '`'
           e <- parseLine
           return (os, e)
         parseLine = try parseDef <|> fmap (\e -> (Nothing, e)) pExpr
@@ -263,11 +263,11 @@ main = do
           (sze@(wMat, hMat), mat) = mkMatrix pict
           matches = (if elem 'a' opts || elem 'n' opts then id else take 1) .
                     matchAllEmpty (Context sze mat grammar) $
-                   if elem 'e' opts
-                   then [(0, 0, wMat, hMat)]
-                   else [(x, y, w, h) |
-                         x <- [-1..wMat], y <- [-1..hMat],
-                         w <- [0..wMat+1-x], h <- [0..hMat+1-y]]
+                    if elem 'e' opts
+                    then [(0, 0, wMat, hMat)]
+                    else [(x, y, w, h) |
+                          x <- [-1..wMat], y <- [-1..hMat],
+                          w <- [0..wMat+1-x], h <- [0..hMat+1-y]]
       when (elem 'd' opts) $ do
         putStrLn opts
         print sze
