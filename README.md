@@ -24,6 +24,7 @@ By default, the interpreter prints the first match it finds, but this can be con
 - `-a`: print all matches.
 - `-p`: print also the positions of the matches, in the format `(x,y,w,h)`.
 - `-s`: do not print the matches themselves.
+- `-b`: include borders of width 1.
 - `-d`: print debug information.
 
 These can be inserted from the command line, or in the beginning of any line of a grammar file, separated from the rest of the line by a backtick `` ` ``.
@@ -38,7 +39,7 @@ Expressions are constructed as follows.
 
 - Any character escaped with `\` matches any `1x1` rectangle containing that character.
 - `.` matches any single character.
-- `$` matches a `1x1` rectangle outside the character matrix.
+- `b` matches a `1x1` rectangle outside the character matrix. It's only relevant if the `-b` option is used, or if the input is not rectangular.
 - `_` matches any rectangle of zero width or height.
 - The pre-defined character groups are `d`igit, `u`ppercase, `l`owercase, `a`lphabetic, alpha`n`umeric, and `s`ymbol.
 - New character classes can be defined by the syntax `[a-prt-w,d-gu]`. The letters on the left are included, and those on the right are excluded, so this matches exactly the letters `abchijklmnoprtvw`. If the left side is empty, it is taken to contain all characters. The comma can be omitted if the right side is empty. The characters `[],-\` must be escaped with `\`.

@@ -67,10 +67,10 @@ pExpr = buildExpressionParser opTable term <?> "expression"
           c <- anyChar
           return $ mkSomeChar [c]
         reserved = do
-          c <- oneOf ("_$.dulans" ++ ['A'..'Z'])
+          c <- oneOf ("_.bdulans" ++ ['A'..'Z'])
           return $ case c of
             '_' -> Empty
-            '$' -> Border
+            'b' -> Border
             '.' -> AnyChar
             'd' -> mkSomeChar ['0'..'9']
             'u' -> mkSomeChar ['A'..'Z']
@@ -133,7 +133,7 @@ pLines = fmap foldTuples . mapM (parse pLine "") . lines
   where foldTuples = foldr (\(a,(b1,b2)) (c,d) -> (a++c, insert b1 b2 d)) ("", empty)
         pLine = try parseOptionLine <|> fmap (\e -> ("", e)) parseLine
         parseOptionLine = do
-          os <- oneOf "enapsd" `manyTill` char '`'
+          os <- oneOf "enapsbd" `manyTill` char '`'
           e <- parseLine
           return (os, e)
         parseLine = try parseDef <|> fmap (\e -> (Nothing, e)) pExpr
@@ -203,7 +203,7 @@ matches (SomeChar cs) (x, y, 1, 1) = do
 matches (SomeChar _) _ = return False
 matches (Var label) rect = do
   memoed <- gets $ lookup (rect, label)
-  case  memoed of
+  case memoed of
     Just b -> return b
     Nothing -> do
       modify $ insert (rect, label) False
@@ -261,13 +261,14 @@ main = do
       pict <- readFile matFile
       let opts = [o | o <- nub $ cmdOpts ++ fileOpts, elem o cmdOpts /= elem o fileOpts]
           (sze@(wMat, hMat), mat) = mkMatrix pict
+          (minX, minY, numX, numY) = if elem 'b' opts then (-1, -1, wMat+1, hMat+1) else (0, 0, wMat, hMat)
           matches = (if elem 'a' opts || elem 'n' opts then id else take 1) .
                     matchAllEmpty (Context sze mat grammar) $
                     if elem 'e' opts
-                    then [(0, 0, wMat, hMat)]
+                    then [(minX, minY, numX, numY)]
                     else [(x, y, w, h) |
-                          x <- [-1..wMat], y <- [-1..hMat],
-                          w <- [0..wMat+1-x], h <- [0..hMat+1-y]]
+                          w <- [0..numX], h <- [0..numY],
+                          x <- [minX..numX-w], y <- [minY..numY-h]]
       when (elem 'd' opts) $ do
         putStrLn opts
         print sze
