@@ -1,1 +1,2 @@
+| Match a 2x2 or larger rectangle of digits.
 d{2-}

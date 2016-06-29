@@ -1,1 +1,2 @@
+| Verify that input is a chessboard of #_.
 e`(\#\#|\#/\#|\_\_|\_/\_)#!&[#_]+/+

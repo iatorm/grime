@@ -1,3 +1,5 @@
+| Verify Prelude syntax: every column has at most one ( or ),
+| and they are balanced if their y-coords are ignored.
 A=[,()]/*
 P=A*|P(A/\(/A)P(A/\)/A)P
 e`P

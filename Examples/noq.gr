@@ -1,1 +1,2 @@
+| Match a 4x4 rectangle without q or Q.
 [,qQ]{4}

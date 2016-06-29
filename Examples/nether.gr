@@ -1,1 +1,2 @@
+| Match a rectangular "nether portal".
 .\X+./\X/+\.{2-22,3-22}\X/+/.\X+.

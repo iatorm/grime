@@ -1,3 +1,9 @@
+| Match a diamond shape, like this:
+|  X
+| / \
+|X   X
+| \ /
+|  X
 C=./+
 T=\X|CTC/\/.+\\
 B=\X|\\.+\//CBC

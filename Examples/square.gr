@@ -1,2 +1,3 @@
+| Verify that input is a square.
 S=.|S./+/.+
 e`S

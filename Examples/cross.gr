@@ -1,3 +1,4 @@
+| Match a "cross" of #-chars.
 E=\.+/+
 F=\#+/+
-EFE/F/EFE&(E/F/E)F(E/F/E)
+EFE/F/EFE&E/F/E F E/F/E
