@@ -23,6 +23,7 @@ type Range = (Int, Maybe Int)
 -- An expression that may or may not match a rectangle of characters
 data Expr = Empty                  -- Mathces a 0xn or nx0 rectangle
           | Border                 -- Matches the rectangle border symbol
+          | AnyRect                -- Mathces any rectangle
           | AnyChar                -- Matches any single character (not border)
           | SomeChar (Set Char)    -- Matches any of the given characters
           | Var Label              -- Matches the given variable
@@ -37,7 +38,8 @@ data Expr = Empty                  -- Mathces a 0xn or nx0 rectangle
 
 instance Show Expr where
   show Empty = "_"
-  show Border = "$"
+  show Border = "b"
+  show AnyRect = "$"
   show AnyChar = "."
   show (SomeChar set) = "[" ++ toAscList set ++ "]"
   show (Var Nothing) = ""
@@ -67,10 +69,11 @@ pExpr = buildExpressionParser opTable term <?> "expression"
           c <- anyChar
           return $ mkSomeChar [c]
         reserved = do
-          c <- oneOf ("_.bdulans" ++ ['A'..'Z'])
+          c <- oneOf ("_$.bdulans" ++ ['A'..'Z'])
           return $ case c of
             '_' -> Empty
             'b' -> Border
+            '$' -> AnyRect
             '.' -> AnyChar
             'd' -> mkSomeChar ['0'..'9']
             'u' -> mkSomeChar ['A'..'Z']
@@ -189,6 +192,7 @@ matches Border (x, y, 1, 1) = do
     Nothing -> True
     Just _ -> False
 matches Border _ = return False
+matches AnyRect _ = return True
 matches AnyChar (x, y, 1, 1) = do
   ch <- asks $ lookup (x, y) . matrix
   return $ case ch of
