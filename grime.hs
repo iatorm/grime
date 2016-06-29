@@ -117,6 +117,7 @@ pExpr = buildExpressionParser opTable term <?> "expression"
         opTable = [[Postfix postfix],
                    [Infix (return (:>)) AssocLeft],
                    [Infix (char '/' >> return (:^)) AssocLeft],
+                   [Infix (char ' ' >> return (:>)) AssocLeft],
                    [Infix (char '&' >> return (:&)) AssocLeft],
                    [Infix (char '|' >> return (:|)) AssocLeft]]
         postfix = fmap (foldr1 (.) . reverse) . many1 . choice . map try $
