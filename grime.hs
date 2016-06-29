@@ -21,8 +21,7 @@ type Rect = (Int, Int, Int, Int) -- x, y, w, h
 type Range = (Int, Maybe Int)
 
 -- An expression that may or may not match a rectangle of characters
-data Expr = Empty                  -- Mathces a 0xn or nx0 rectangle
-          | Border                 -- Matches the rectangle border symbol
+data Expr = Border                 -- Matches the rectangle border symbol
           | AnyRect                -- Mathces any rectangle
           | AnyChar                -- Matches any single character (not border)
           | SomeChar (Set Char)    -- Matches any of the given characters
@@ -37,7 +36,6 @@ data Expr = Empty                  -- Mathces a 0xn or nx0 rectangle
           | Sized Range Range Expr -- Size range
 
 instance Show Expr where
-  show Empty = "_"
   show Border = "b"
   show AnyRect = "$"
   show AnyChar = "."
@@ -68,13 +66,17 @@ pExpr = buildExpressionParser opTable term <?> "expression"
           char '\\'
           c <- anyChar
           return $ mkSomeChar [c]
+        flat = Sized (0, Nothing) (0, Just 0) AnyRect
+        thin = Sized (0, Just 0) (0, Nothing) AnyRect
         reserved = do
-          c <- oneOf ("_$.bdulans" ++ ['A'..'Z'])
+          c <- oneOf ("_$.ftbdulans" ++ ['A'..'Z'])
           return $ case c of
-            '_' -> Empty
+            '_' -> flat :| thin
             'b' -> Border
             '$' -> AnyRect
             '.' -> AnyChar
+            'f' -> flat
+            't' -> thin
             'd' -> mkSomeChar ['0'..'9']
             'u' -> mkSomeChar ['A'..'Z']
             'l' -> mkSomeChar ['a'..'z']
@@ -119,15 +121,16 @@ pExpr = buildExpressionParser opTable term <?> "expression"
                    [Infix (char '|' >> return (:|)) AssocLeft]]
         postfix = fmap (foldr1 (.) . reverse) . many1 . choice . map try $
           [sizeRange,
-           char '?' >> return (Empty :|),
+           char '?' >> return (thin :|),
+           string "/?" >> return (flat :|),
            char '+' >> return HPlus,
-           char '*' >> return (\e -> Empty :| HPlus e),
+           char '*' >> return (\e -> thin :| HPlus e),
            string "/+" >> return VPlus,
-           string "/*" >> return (\e -> Empty :| VPlus e),
+           string "/*" >> return (\e -> flat :| VPlus e),
            char '!' >> return Not,
            char '#' >> return contains]
-        contains expr = rect :^ (rect :> expr :> rect) :^ rect
-          where rect = Empty :| (HPlus $ VPlus AnyChar)
+        contains expr = (flat :| rect) :^ ((thin :| rect) :> expr :> (thin :| rect)) :^ (flat :| rect)
+          where rect = HPlus $ VPlus AnyChar
 
 
 -- File parser
@@ -185,7 +188,6 @@ allM xs f = foldr (&?) (return True) $ map f xs
 
 -- Does the pattern match? Update all sub-rectangles as needed
 matches :: Expr -> Rect -> Matcher Bool
-matches Empty (_, _, w, h) = return $ w == 0 || h == 0
 matches Border (x, y, 1, 1) = do
   ch <- asks $ lookup (x, y) . matrix
   return $ case ch of
