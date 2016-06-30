@@ -68,7 +68,7 @@ charClass = char '[' `between` char ']' $ do
         classChar = noneOf needsEscape <|> (char '\\' >> oneOf needsEscape)
         classRange = do
           a <- classChar
-          char ','
+          char '-'
           b <- classChar
           return [a..b]
 
