@@ -26,20 +26,21 @@ main = do
       let opts = [o | o <- nub $ cmdOpts ++ fileOpts, elem o cmdOpts /= elem o fileOpts]
           (sze@(wMat, hMat), mat) = parseMatFile pict
           (minX, minY, numX, numY) = if elem 'b' opts then (-1, -1, wMat+1, hMat+1) else (0, 0, wMat, hMat)
-          matches = (if elem 'a' opts || elem 'n' opts then id else take 1) .
-                    matchAllEmpty (Context sze mat grammar) $
-                    if elem 'e' opts
-                    then [(minX, minY, numX, numY)]
-                    else [(x, y, w, h) |
-                          w <- [0..numX], h <- [0..numY],
-                          x <- [minX..numX-w], y <- [minY..numY-h]]
+          (matches, logs) = matchAllEmpty (Context sze mat grammar) $
+                            if elem 'e' opts
+                            then [(minX, minY, numX, numY)]
+                            else [(x, y, w, h) |
+                                  w <- [0..numX], h <- [0..numY],
+                                  x <- [minX..numX-w], y <- [minY..numY-h]]
+          finalMatches = if elem 'a' opts || elem 'n' opts then matches else take 1 matches
       when (elem 'd' opts) $ do
         putStrLn opts
         print sze
         forM_ (toList grammar) $ \(l, e) ->
           putStrLn $ (case l of Nothing -> "Pat = "; Just a -> a:" = ") ++ show e
+        putStr logs
       if (elem 'n' opts /= elem 'e' opts)
-        then print $ length matches
-        else forM_ matches $ \rect -> do
+        then print $ length finalMatches
+        else forM_ finalMatches $ \rect -> do
         when (elem 'p' opts) $ print rect
         when (not $ elem 's' opts) . putStrLn $ submatrix rect pict

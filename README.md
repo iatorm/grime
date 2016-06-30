@@ -58,7 +58,16 @@ Lines beginning with `|` are comments, and the parser ignores them.
 
 ## Notes
 
-Grime does allow paradoxical definitions of the form `A=A!` with undefined behavior.
-However, they will not cause crashes or infinite loops.
+Grime does allow paradoxical definitions of the form `A=A!`; these will result in no match.
+In general, the matching engine can resolve any grammar where no match of a single nonterminal on a single rectangle depends on itself (although for complex grammars, this can take a while).
+A nontrivial example of a resolvable grammar is
 
-Grime supports non-rectangular inputs; the rows are simple aligned to the left, and the gaps can be matched using `b`.
+    A=\a|E\a
+    B=[ab]+&A!
+    E=A|B
+    a`A
+
+Given a one-dimensional string of `a`s and `b`s, this grammar will match every substring that ends in `a`.
+Note how the nonterminal `A` is self-referential in more than one way (via `E` directly, and via `E` through `B`), but since the `E` in `A` must be a proper substring, the system can always be resolved.
+
+Grime supports non-rectangular inputs; the rows are simply aligned to the left, and the gaps can be matched using `b`.
