@@ -7,7 +7,7 @@ import Data.Set (Set, member, toAscList)
 import Data.Monoid (Any(Any), getAny)
 import Control.Monad (filterM)
 import Control.Monad.Trans (lift)
-import Control.Monad.Trans.Writer.Lazy (WriterT, tell, listens, runWriterT)
+import Control.Monad.Trans.Writer.Lazy (WriterT, tell, listen, listens, runWriterT)
 import Control.Monad.Trans.Reader (ReaderT, asks, runReaderT)
 import Control.Monad.State.Lazy (State, gets, modify, evalState)
 
@@ -108,6 +108,10 @@ data Context = Context {size :: Size,
 -- The String is for logging, and the Any for keeping track of new definite matches or non-matches
 type Matcher a = WriterT (String, Any) (ReaderT Context (State Classification)) a
 
+-- Helper function for logging
+logMsg :: String -> Matcher ()
+logMsg message = tell (message, mempty)
+
 -- Does the pattern match? Update all sub-rectangles as needed
 matches :: Expr -> Rect -> Matcher Match
 
@@ -140,10 +144,11 @@ matches (Var label) rect = do
     Just b -> return b
     Nothing -> do
       modify $ insert (rect, label) Unknown
-      tell $ ("Checking " ++ show label ++ " at " ++ show rect ++ "\n", Any False)
+      logMsg $ "Checking " ++ show label ++ " at " ++ show rect ++ "\n"
       Just expr <- lift $ asks $ lookup label . clauses
       match <- matches expr rect
-      tell $ ("Checked  " ++ show label ++ " at " ++ show rect ++ ": " ++ show match ++ "\n", Any $ match /= Unknown)
+      logMsg $ "Checked  " ++ show label ++ " at " ++ show rect ++ ": " ++ show match ++ "\n"
+      tell (mempty, Any $ match /= Unknown)
       modify $ insert (rect, label) match
       return match
 
@@ -183,12 +188,16 @@ matches (Sized (x1, x2) (y1, y2) exp) r@(x, y, w, h) = do
 -- Collect definite matches of Nothing for the given rectangles, possibly looping until no uncertainty remains.
 -- Also collect logs for debugging.
 matchAllEmpty :: Context -> [Rect] -> ([Rect], String)
-matchAllEmpty con rects = flip evalState empty . flip runReaderT con . fmap (\(a,(b,_)) -> (a,b)) . runWriterT $ go
-  where go :: Matcher [Rect]
-        go = do
+matchAllEmpty con rects = flip evalState empty . flip runReaderT con . fmap (\(a,(b,_)) -> (a,b)) . runWriterT $ go rects
+  where go :: [Rect] -> Matcher [Rect]
+        go currRects = do
+          logMsg "Matching...\n"
           modify $ Map.filter (/= Unknown)
           Just expr <- lift $ asks $ lookup Nothing . clauses
-          (currMatches, changed) <- listens (getAny . snd) $ mapM (\rect -> (,) rect <$> matches expr rect) rects
-          if all ((/= Unknown) . snd) currMatches || not changed
-            then return $ map fst $ filter ((== Match) . snd) currMatches
-            else go
+          (currMatches, changed) <- listens (getAny . snd) $ mapM (\rect -> (,) rect <$> matches expr rect) currRects
+          logMsg $ "Matching complete, change = " ++ show changed ++ "\n"
+          if and [match /= Unknown | (_, match) <- currMatches] || not changed
+            then return $ [rect | (rect, Match) <- currMatches]
+            else do
+                 remainingMatches <- go [rect | (rect, Unknown) <- currMatches]
+                 return $ [rect | (rect, Match) <- currMatches] ++ remainingMatches
