@@ -5,8 +5,9 @@ import Data.Maybe (catMaybes)
 import Data.List ((\\), sort)
 import Data.Set (fromAscList)
 import Data.Map.Strict (Map, empty, insert, fromList)
+import Control.Applicative((<$>), (<*))
 import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy)
-import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit, endOfLine)
+import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
 import Text.Parsec.Expr
 
 -- Usable option characters
@@ -116,8 +117,7 @@ expression = buildExpressionParser opTable term <?> "expression"
         postfix = do
           operations <- many1 $ choice postfixes
           return $ foldr1 (flip (.)) operations
-        contains expr = (flat :| rect) :^ ((thin :| rect) :> expr :> (thin :| rect)) :^ (flat :| rect)
-          where rect = HPlus $ VPlus AnyChar
+        contains expr = AnyRect :^ (AnyRect :> expr :> AnyRect) :^ AnyRect
 
 -- Parse a line of a grammar file into options, label, and expression
 contentLine :: Parsec String () (String, (Label, Expr))
@@ -137,6 +137,13 @@ commentLine = do
 -- Parse either a content line or a comment
 grammarLine :: Parsec String () (Maybe (String, (Label, Expr)))
 grammarLine = try (commentLine >> return Nothing) <|> (Just <$> contentLine)
+
+-- Skip an end of line
+endOfLine :: Parsec String () ()
+endOfLine =
+  (try (string "\r\n") >> return ()) <|>
+  (char '\n' >> return ()) <|>
+  (char '\r' >> return ()) <?> "end of line"
 
 -- File parser
 parseGrFile :: String -> Either ParseError (String, Map Label Expr)
