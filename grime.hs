@@ -34,10 +34,11 @@ main = do
                                   x <- [minX..numX-w], y <- [minY..numY-h]]
           finalMatches = if elem 'a' opts || elem 'n' opts then matches else take 1 matches
       when (elem 'd' opts) $ do
-        putStrLn opts
-        print sze
+        putStrLn $ "Options: " ++ opts
+        putStrLn $ "Input dimensions: " ++ show sze
+        putStrLn "Definitions:"
         forM_ (toList grammar) $ \(l, e) ->
-          putStrLn $ (case l of Nothing -> "Pat = "; Just a -> a:" = ") ++ show e
+          putStrLn $ " " ++ (case l of Nothing -> "Toplevel pattern = "; Just a -> a:" = ") ++ show e
         putStr logs
       if (elem 'n' opts /= elem 'e' opts)
         then print $ length finalMatches
