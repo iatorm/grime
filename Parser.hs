@@ -18,8 +18,8 @@ flat = Sized (0, Nothing) (0, Just 0) AnyRect
 thin = Sized (0, Just 0) (0, Nothing) AnyRect
 
 -- Make a finite character class from string
-mkSomeChar :: String -> Expr
-mkSomeChar = SomeChar . fromAscList . sort
+mkSomeChar :: Bool -> String -> Expr
+mkSomeChar isPos = SomeChar isPos . fromAscList . sort
 
 -- Single-character expressions
 reservedChars = [('$', AnyRect),
@@ -28,19 +28,19 @@ reservedChars = [('$', AnyRect),
                  ('t', thin),
                  ('_', flat :| thin),
                  ('b', Border),
-                 ('d', mkSomeChar ['0'..'9']),
-                 ('u', mkSomeChar ['A'..'Z']),
-                 ('l', mkSomeChar ['a'..'z']),
-                 ('a', mkSomeChar $ ['A'..'Z'] ++ ['a'..'z']),
-                 ('n', mkSomeChar $ ['0'..'9'] ++ ['A'..'Z'] ++ ['a'..'z']),
-                 ('s', mkSomeChar $ ['!'..'/'] ++ [':'..'@'] ++ ['['..'`'] ++ ['{'..'~'])]
+                 ('d', mkSomeChar True ['0'..'9']),
+                 ('u', mkSomeChar True ['A'..'Z']),
+                 ('l', mkSomeChar True ['a'..'z']),
+                 ('a', mkSomeChar True $ ['A'..'Z'] ++ ['a'..'z']),
+                 ('n', mkSomeChar True $ ['0'..'9'] ++ ['A'..'Z'] ++ ['a'..'z']),
+                 ('s', mkSomeChar True $ ['!'..'/'] ++ [':'..'@'] ++ ['['..'`'] ++ ['{'..'~'])]
 
 -- Parse an escaped literal
 escapedLit :: Parsec String () Expr
 escapedLit = do
   char '\\'
   c <- anyChar
-  return $ mkSomeChar [c]
+  return $ mkSomeChar True [c]
 
 -- Parse a nonterminal
 nonterm :: Parsec String () Expr
@@ -62,9 +62,9 @@ charClass = char '[' `between` char ']' $ do
   maybeExclude <- optionMaybe $ char ',' >> (many $ try classRange <|> pure <$> classChar)
   return $ case (null include, maybeExclude) of
     (True, Nothing) -> AnyChar
-    (False, Nothing) -> mkSomeChar $ concat include
-    (True, Just exclude) -> AnyChar :& (Not . mkSomeChar $ concat exclude)
-    (False, Just exclude) -> mkSomeChar $ concat include \\ concat exclude
+    (False, Nothing) -> mkSomeChar True $ concat include
+    (True, Just exclude) -> mkSomeChar False $ concat exclude
+    (False, Just exclude) -> mkSomeChar True $ concat include \\ concat exclude
   where needsEscape = "[]-,\\"
         classChar = noneOf needsEscape <|> (char '\\' >> oneOf needsEscape)
         classRange = do

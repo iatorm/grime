@@ -21,25 +21,28 @@ type Rect = (Int, Int, Int, Int) -- x, y, w, h
 type Range = (Int, Maybe Int)
 
 -- An expression that may or may not match a rectangle of characters
-data Expr = Border                 -- Matches the rectangle border symbol
-          | AnyRect                -- Mathces any rectangle
-          | AnyChar                -- Matches any single character (not border)
-          | SomeChar (Set Char)    -- Matches any of the given characters
-          | Var Label              -- Matches the given variable
-          | Expr :> Expr           -- Horizontal concatenation
-          | HPlus Expr             -- Horizontal repetition
-          | Expr :^ Expr           -- Vertical concatenation
-          | VPlus Expr             -- Vertical repetition
-          | Expr :| Expr           -- Disjunction
-          | Expr :& Expr           -- Conjunction
-          | Not Expr               -- Negation
-          | Sized Range Range Expr -- Size range
+data Expr = Border                   -- Matches the rectangle border symbol
+          | AnyRect                  -- Mathces any rectangle
+          | AnyChar                  -- Matches any single character (not border)
+          | SomeChar Bool (Set Char) -- Matches if flag XOR char in set
+          | Var Label                -- Matches the given variable
+          | Expr :> Expr             -- Horizontal concatenation
+          | HPlus Expr               -- Horizontal repetition
+          | Expr :^ Expr             -- Vertical concatenation
+          | VPlus Expr               -- Vertical repetition
+          | Expr :| Expr             -- Disjunction
+          | Expr :& Expr             -- Conjunction
+          | Not Expr                 -- Negation
+          | Sized Range Range Expr   -- Size range
 
 instance Show Expr where
   show Border = "b"
   show AnyRect = "$"
   show AnyChar = "."
-  show (SomeChar set) = "[" ++ toAscList set ++ "]"
+  show (SomeChar isPos charSet) =
+    if isPos
+    then "[p:" ++ toAscList charSet ++ "]"
+    else "[n:" ++ toAscList charSet ++ "]"
   show (Var Nothing) = ""
   show (Var (Just a)) = [a]
   show (e1 :> e2) = show e1 ++ show e2
@@ -132,12 +135,12 @@ matches AnyChar (x, y, 1, 1) = do
     Just _ -> Match
 matches AnyChar _ = return NoMatch
 
-matches (SomeChar cs) (x, y, 1, 1) = do
+matches (SomeChar isPos cs) (x, y, 1, 1) = do
   ch <- lift $ asks $ lookup (x, y) . matrix
   return $ case ch of
-      Just c -> if c `member` cs then Match else NoMatch
+      Just c -> if (c `member` cs) == isPos then Match else NoMatch
       Nothing -> NoMatch
-matches (SomeChar _) _ = return NoMatch
+matches (SomeChar _ _) _ = return NoMatch
 
 matches (Var label) rect = do
   memoed <- gets $ lookup (rect, label)
@@ -181,7 +184,7 @@ matches (Sized (x1, x2) (y1, y2) exp) r@(x, y, w, h) = do
   return (if xOk && yOk then Match else NoMatch) &? case exp of
     Border -> allMatch
     AnyChar -> allMatch
-    SomeChar _ -> allMatch
+    SomeChar _ _ -> allMatch
     _ -> matches exp r
   where allMatch = allM [(x+i, y+j, 1, 1) | i <- [0..w-1], j <- [0..h-1]] $
                    matches exp
