@@ -5,7 +5,7 @@ import Data.Maybe (catMaybes)
 import Data.List ((\\), sort)
 import Data.Set (fromAscList)
 import Data.Map.Strict (Map, empty, insert, fromList)
-import Control.Applicative((<$>), (<*))
+import Control.Applicative((<$>), (<*), pure)
 import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy)
 import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
 import Text.Parsec.Expr
