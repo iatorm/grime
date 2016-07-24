@@ -1,6 +1,6 @@
 module Parser (parseGrFile, parseMatFile, validOpts) where
 
-import Matcher
+import Expression
 import Data.Maybe (catMaybes)
 import Data.List ((\\), sort)
 import Data.Set (fromAscList)

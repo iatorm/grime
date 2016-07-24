@@ -1,7 +1,8 @@
 -- A two-dimensional language based on Boolean grammars
 
-import Matcher
-import Parser
+import Expression
+import Matcher (matchAllEmpty)
+import Parser (parseMatFile, parseGrFile)
 import Data.List (nub)
 import Data.Map.Strict (toList)
 import Control.Monad (forM_, when)
@@ -18,9 +19,10 @@ main = do
   let (cmdOpts, grFile, matFile) = case args of
         ['-':a, b, c] -> (a, b, c)
         [a, b] -> ("", a, b)
+        _ -> error "Incorrect arguments. Usage: grime [opts] grammarfile patternfile"
   parsedGrammar <- fmap parseGrFile $ readFile grFile
   case parsedGrammar of
-    Left error -> print error
+    Left parseError -> print parseError
     Right (fileOpts, grammar) -> do
       pict <- readFile matFile
       let opts = [o | o <- nub $ cmdOpts ++ fileOpts, elem o cmdOpts /= elem o fileOpts]
