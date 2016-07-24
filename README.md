@@ -17,6 +17,14 @@ For example, the digits program would be called like
 
     runhaskell grime.hs digits.gr digit-matrix
 
+If you want a speed boost, you should compile Grime with the command
+
+	ghc -O2 grime.hs
+
+and then run the resulting executable:
+
+	grime [options] grammarfile matrixfile
+
 By default, the interpreter prints the first match it finds, but this can be controlled using the option flags:
 
 - `-e`: match only the entire matrix, print `1` for match and `0` for no match.

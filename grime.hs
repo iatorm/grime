@@ -32,7 +32,7 @@ main = do
                             if elem 'e' opts
                             then [(minX, minY, numX, numY)]
                             else [(x, y, w, h) |
-                                  w <- [0..numX], h <- [0..numY],
+                                  w <- [numX,numX-1..0], h <- [numY,numY-1..0],
                                   x <- [minX..numX-w], y <- [minY..numY-h]]
           finalMatches = if elem 'a' opts || elem 'n' opts then matches else take 1 matches
       when (elem 'd' opts) $ do
