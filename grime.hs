@@ -40,7 +40,7 @@ main = do
         putStrLn $ "Input dimensions: " ++ show sze
         putStrLn "Definitions:"
         forM_ (toList grammar) $ \(l, e) ->
-          putStrLn $ " " ++ (case l of Nothing -> "Toplevel pattern = "; Just a -> a:" = ") ++ show e
+          putStrLn $ " " ++ (case l of Nothing -> "_ = "; Just a -> a:" = ") ++ show e
         putStr logs
       if (elem 'n' opts /= elem 'e' opts)
         then print $ length finalMatches

@@ -127,27 +127,27 @@ matches (exp1 :& exp2) rect = matches exp1 rect &? matches exp2 rect
 
 matches (Not expr) rect = invert <$> matches expr rect
 
-matches (Sized (x1, x2) (y1, y2) exp) r@(x, y, w, h) = do
+matches (Sized (x1, x2) (y1, y2) expr) r@(x, y, w, h) = do
   let xOk = x1 <= w && case x2 of Nothing -> True; Just x3 -> w <= x3
       yOk = y1 <= h && case y2 of Nothing -> True; Just y3 -> h <= y3
-  return (if xOk && yOk then Match else NoMatch) &? case exp of
+  return (if xOk && yOk then Match else NoMatch) &? case expr of
     Border -> allMatch
     AnyChar -> allMatch
     SomeChar _ _ -> allMatch
-    _ -> matches exp r
+    _ -> matches expr r
   where allMatch = allM [(x+i, y+j, 1, 1) | i <- [0..w-1], j <- [0..h-1]] $
-                   matches exp
+                   matches expr
 
 -- Collect definite matches of Nothing for the given rectangles, possibly looping until no uncertainty remains.
 -- Also collect logs for debugging.
 matchAllEmpty :: Context -> [Rect] -> ([Rect], String)
 matchAllEmpty con rects = flip evalState empty . flip runReaderT con . fmap (\(a,(b,_)) -> (a,b)) . runWriterT $ go rects
-  where go :: [Rect] -> Matcher [Rect]
+  where selfAndMatch rect = (,) rect <$> matches (Var Nothing) rect
+        go :: [Rect] -> Matcher [Rect]
         go currRects = do
           logMsg "Matching...\n"
           modify $ Map.filter (/= Unknown)
-          Just expr <- lift $ asks $ lookup Nothing . clauses
-          (currMatches, changed) <- listens (getAny . snd) $ mapM (\rect -> (,) rect <$> matches expr rect) currRects
+          (currMatches, changed) <- listens (getAny . snd) $ mapM selfAndMatch currRects
           logMsg $ "Matching complete, change = " ++ show changed ++ "\n"
           if and [match /= Unknown | (_, match) <- currMatches] || not changed
             then return $ [rect | (rect, Match) <- currMatches]

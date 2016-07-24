@@ -34,7 +34,7 @@ instance Show Expr where
     if isPos
     then "[p:" ++ toAscList charSet ++ "]"
     else "[n:" ++ toAscList charSet ++ "]"
-  show (Var Nothing) = ""
+  show (Var Nothing) = "_"
   show (Var (Just a)) = [a]
   show (e1 :> e2) = show e1 ++ show e2
   show (HPlus e) = "(" ++ show e ++ ")+"

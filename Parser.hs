@@ -11,10 +11,13 @@ import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
 import Text.Parsec.Expr
 
 -- Usable option characters
+validOpts :: String
 validOpts = "abdenps"
 
 -- Special expressions
+flat :: Expr
 flat = Sized (0, Nothing) (0, Just 0) AnyRect
+thin :: Expr
 thin = Sized (0, Just 0) (0, Nothing) AnyRect
 
 -- Make a finite character class from string
@@ -22,11 +25,12 @@ mkSomeChar :: Bool -> String -> Expr
 mkSomeChar isPos = SomeChar isPos . fromAscList . sort
 
 -- Single-character expressions
+reservedChars :: [(Char, Expr)]
 reservedChars = [('$', AnyRect),
                  ('.', AnyChar),
                  ('f', flat),
                  ('t', thin),
-                 ('_', flat :| thin),
+                 ('_', Var Nothing),
                  ('b', Border),
                  ('d', mkSomeChar True ['0'..'9']),
                  ('u', mkSomeChar True ['A'..'Z']),
