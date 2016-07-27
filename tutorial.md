@@ -49,9 +49,9 @@ Thus, `\a+\b` matches an **n&times;1** rectangle, where **n &ge; 2**, the rightm
 The expression `\a+\b\a+` matches one `b` surrounded by one or more `a`s on both sides.
 
 Let's try out this grammar!
-Create a grammar file named `ex1.gr`, containing only the expression `\a+\b\a+`, and a pattern file named `pat1` containing the string `ababaa`.
-Then, run `grime ex1.gr pat1` on the command line.
-The result should be `abaa`, the first matching sub-rectangle that Grime found in the pattern file (it tries large rectangles first, so `abaa` matches before anything else).
+Grime has an [online interpreter](http://grime.tryitonline.net/) hosted by [Dennis from PPCG](http://codegolf.stackexchange.com/users/12012/dennis).
+Paste the expression `\a+\b\a+` on the Code box (which corresponds to the grammar file), the string `ababaa` to the Input box (which corresponds to the pattern file), and click Run.
+The result in the Output box should be `abaa`, the first matching sub-rectangle that Grime found in the pattern string (it tries large rectangles first, so `abaa` matches before anything else).
 
 The grammar file may contain _option flags_, which are reparated from the main grammar by a backtick.
 If you modify the grammar into `` a`\a\b+ ``, the output will list all matched sub-rectangles instead of just the first.
@@ -270,5 +270,9 @@ You can define very complex grammars using nonterminals whose definitions refer 
 > Write a grammar that matches correctly nested parentheses `()` and `[]`, like this:
 >
 >     (())[()([])]
+
+## Contect Brackets
+
+_TODO_
 
 <sup>1</sup> This is not entirely true, as character classes are given special treatement by the size constraint operator. We'll return to that later.

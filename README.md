@@ -5,6 +5,9 @@
 Grime is a two-dimensional pattern matching language based on Boolean grammars.
 The basic idea is to construct rectangular patterns from smaller components, and check whether they are found in the input matrix.
 
+You can [try Grime online](http://grime.tryitonline.net/), courtesy of [Dennis from PPCG](http://codegolf.stackexchange.com/users/12012/dennis).
+Be sure to check the [tutorial](https://github.com/iatorm/grime/blob/master/tutorial.md) too.
+
 ## Usage
 
 A Grime program is called  a _grammar_, and the correct file extension for a grammar is `.gr`, although this is not enforced.
