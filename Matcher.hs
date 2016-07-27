@@ -8,8 +8,8 @@ import Data.Set (member)
 import Data.Monoid (Any(Any), getAny, mempty)
 import Control.Applicative ((<$>))
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Writer.Lazy (WriterT, tell, listens, runWriterT)
-import Control.Monad.Trans.Reader (ReaderT, asks, runReaderT)
+import Control.Monad.Writer.Lazy (WriterT, tell, listens, runWriterT)
+import Control.Monad.Reader (ReaderT, asks, reader, local, runReaderT)
 import Control.Monad.State.Lazy (State, gets, modify, evalState)
 
 -- A fuzzy match
@@ -57,9 +57,20 @@ allM xs f = foldr (&?) (return Match) $ f <$> xs
 -- A memoization of matches
 type Classification = Map (Rect, Label) Match
 
+-- A changing context for matching in a matrix
+data Context = Context {size :: Size,
+                        matrix :: Map Coord Char,
+                        clauses :: Map Label Expr,
+                        anchors :: [Rect]}
+            deriving (Show)
+
 -- A monad for performing matching in a matrix
 -- The String is for logging, and the Any for keeping track of new definite matches or non-matches
 type Matcher a = WriterT (String, Any) (ReaderT Context (State Classification)) a
+
+-- Modify context anchors
+withAnchors :: ([Rect] -> [Rect]) -> Matcher a -> Matcher a
+withAnchors f = local $ \con -> con{anchors = f $ anchors con}
 
 -- Helper function for logging
 logMsg :: String -> Matcher ()
@@ -138,11 +149,26 @@ matches (Sized (x1, x2) (y1, y2) expr) r@(x, y, w, h) = do
   where allMatch = allM [(x+i, y+j, 1, 1) | i <- [0..w-1], j <- [0..h-1]] $
                    matches expr
 
+matches (InContext expr) r@(x, y, w, h) = do
+  (maxX, maxY) <- asks size
+  let surrounding = [(x', y', w', h') | x' <- [0..x], y' <- [0..y],
+                                        w' <- [w..maxX-x'], h' <- [h..maxX-y']]
+  withAnchors (++[r]) $ anyM surrounding $ matches expr
+
+matches (Anchor n) r = do
+  anchs <- asks anchors
+  return $ if anchs !! n == r then Match else NoMatch
+
 -- Collect definite matches of Nothing for the given rectangles, possibly looping until no uncertainty remains.
 -- Also collect logs for debugging.
-matchAllEmpty :: Context -> [Rect] -> ([Rect], String)
-matchAllEmpty con rects = flip evalState empty . flip runReaderT con . fmap (\(a,(b,_)) -> (a,b)) . runWriterT $ go rects
-  where selfAndMatch rect = (,) rect <$> matches (Var Nothing) rect
+matchAllEmpty :: Size -> Map Coord Char -> Map Label Expr -> [Rect] -> ([Rect], String)
+matchAllEmpty size matrix clauses rects = flip evalState empty .
+                                          flip runReaderT context .
+                                          fmap (\(a,(b,_)) -> (a,b)) .
+                                          runWriterT $
+                                          go rects
+  where context = Context {size = size, matrix = matrix, clauses = clauses, anchors = []}
+        selfAndMatch rect = (,) rect <$> matches (Var Nothing) rect
         go :: [Rect] -> Matcher [Rect]
         go currRects = do
           logMsg "Matching...\n"

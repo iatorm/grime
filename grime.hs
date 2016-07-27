@@ -28,7 +28,7 @@ main = do
       let opts = [o | o <- nub $ cmdOpts ++ fileOpts, elem o cmdOpts /= elem o fileOpts]
           (sze@(wMat, hMat), mat) = parseMatFile pict
           (minX, minY, numX, numY) = if elem 'b' opts then (-1, -1, wMat+1, hMat+1) else (0, 0, wMat, hMat)
-          (matches, logs) = matchAllEmpty (Context sze mat grammar) $
+          (matches, logs) = matchAllEmpty sze mat grammar $
                             if elem 'e' opts
                             then [(minX, minY, numX, numY)]
                             else [(x, y, w, h) |

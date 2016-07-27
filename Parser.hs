@@ -98,11 +98,18 @@ sizeConstr = char '{' `between` char '}' $ do
     Nothing -> Sized xRange xRange
     Just yRange -> Sized xRange yRange
 
+-- Parse a context anchor
+anchor :: Parsec String () Expr
+anchor = do
+  label <- oneOf ['0'..'9']
+  return $ Anchor $ read [label]
+
 -- Parse an expression
 expression :: Parsec String () Expr
 expression = buildExpressionParser opTable term <?> "expression"
-  where term = parens expression <|> nonterm <|> reserved <|> escapedLit <|> charClass <?> "term"
-        parens = char '(' `between` char ')'
+  where term = parenthesized <|> inContext <|> anchor <|> nonterm <|> reserved <|> escapedLit <|> charClass <?> "term"
+        parenthesized = char '(' `between` char ')' $ expression
+        inContext = char '<' `between` char '>' $ InContext <$> expression
         opTable = [[Postfix postfix],
                    [Infix (return (:>)) AssocLeft],
                    [Infix (char '/' >> return (:^)) AssocLeft],

@@ -6,6 +6,9 @@ import Data.Map (Map)
 -- The label of a variable
 type Label = Maybe Char
 
+-- Context anchor label; begins from 0
+type AnchorLabel = Int
+
 type Coord = (Int, Int) -- x, y
 type Size = (Int, Int) -- w, h
 type Rect = (Int, Int, Int, Int) -- x, y, w, h
@@ -25,6 +28,8 @@ data Expr = Border                   -- Matches the rectangle border symbol
           | Expr :& Expr             -- Conjunction
           | Not Expr                 -- Negation
           | Sized Range Range Expr   -- Size range
+          | InContext Expr           -- Context brackets
+          | Anchor AnchorLabel       -- Context anchor
 
 instance Show Expr where
   show Border = "b"
@@ -47,9 +52,5 @@ instance Show Expr where
     show e ++ "{" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"
     where sx2 = case x2 of Nothing -> ""; Just x -> show x
           sy2 = case y2 of Nothing -> ""; Just y -> show y
-
--- An unchanging context for matching in a matrix
-data Context = Context {size :: Size,
-                        matrix :: Map Coord Char,
-                        clauses :: Map Label Expr}
-            deriving (Show)
+  show (InContext e) = "<" ++ show e ++ ">"
+  show (Anchor n) = show n
