@@ -6,7 +6,7 @@ import Data.List ((\\), sort)
 import Data.Set (fromAscList)
 import Data.Map.Strict (Map, empty, insert, fromList)
 import Control.Applicative((<$>), (<*), pure)
-import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy)
+import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy, notFollowedBy)
 import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
 import Text.Parsec.Expr
 
@@ -110,12 +110,24 @@ expression = buildExpressionParser opTable term <?> "expression"
   where term = parenthesized <|> inContext <|> anchor <|> nonterm <|> reserved <|> escapedLit <|> charClass <?> "term"
         parenthesized = char '(' `between` char ')' $ expression
         inContext = char '<' `between` char '>' $ InContext <$> expression
-        opTable = [[Postfix postfix],
-                   [Infix (return (:>)) AssocLeft],
-                   [Infix (char '/' >> return (:^)) AssocLeft],
-                   [Infix (char ' ' >> return (:>)) AssocLeft],
-                   [Infix (char '&' >> return (:&)) AssocLeft],
-                   [Infix (char '|' >> return (:|)) AssocLeft]]
+        opTable = [[Postfix $ try $ postfix <* char '^'],
+                   [Infix (return (:>) <* char '^') AssocLeft],
+                   [Infix (try $ string "/^" >> return (:^)) AssocLeft],
+                   [Infix (try $ string " ^" >> return (:>)) AssocLeft],
+                   [Infix (try $ string "&^" >> return (:&)) AssocLeft],
+                   [Infix (try $ string "|^" >> return (:|)) AssocLeft],
+                   [Postfix $ try $ postfix <* notFollowedBy (oneOf "^v")],
+                   [Infix (notFollowedBy (oneOf "^v") >> return (:>)) AssocLeft],
+                   [Infix (try $ char '/' >> notFollowedBy (oneOf "^v") >> return (:^)) AssocLeft],
+                   [Infix (try $ char ' ' >> notFollowedBy (oneOf "^v") >> return (:>)) AssocLeft],
+                   [Infix (try $ char '&' >> notFollowedBy (oneOf "^v") >> return (:&)) AssocLeft],
+                   [Infix (try $ char '|' >> notFollowedBy (oneOf "^v") >> return (:|)) AssocLeft],
+                   [Postfix $ try $ postfix <* char 'v'],
+                   [Infix (return (:>) <* char 'v') AssocLeft],
+                   [Infix (try $ string "/v" >> return (:^)) AssocLeft],
+                   [Infix (try $ string " v" >> return (:>)) AssocLeft],
+                   [Infix (try $ string "&v" >> return (:&)) AssocLeft],
+                   [Infix (try $ string "|v" >> return (:|)) AssocLeft]]
         postfixes = [sizeConstr,
                      char '?' >> return (thin :|),
                      try (string "/?") >> return (flat :|),

@@ -66,6 +66,7 @@ Expressions are constructed as follows.
 - `P{a-b,c-d}`, where `abcd` are nonnegative integers, is a _size constraint_ on `P`. If `P` is a character class, then the expression matches any `mxn` rectangle containing only those characters, provided that `m` is between `a` and `b` inclusive, and `n` is between `c` and `d` inclusive. In other cases, the expression matches any rectangle that has the correct size and that `P` also matches. If `a` or `c` are omitted, they are taken to be `0`, and if `b` or `d` are omitted, they are infinite. If the hyphen between `a` and `b` is omitted, then we use the same number for both ends of the interval. If the entire `c-d` part is omitted, both axes are constrained. To clarify, `{-b}` is equivalent to `{0-b,0-b}`, and `{a-,c}` is equivalent to `{a-infinity,c-c}`.
 - `<P>` is a _context bracket_. It matches any rectangle **r** that's contained in a larger rectangle that matches `P`. The rectangle **r** can be matched by a digit in `P`; this is `0` by default, and increases with the nesting depth.
 
+You can add the suffix `^` to any infix or postfix operator to raise its precedence higher than all other operators, or `v` to lower it; for example, `\a\b|^\c+v` is parsed as `(\a(\b|\c))+`.
 Lines beginning with `|` are comments, and the parser ignores them.
 
 ## Notes
