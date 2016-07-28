@@ -169,10 +169,10 @@ endOfLine =
   (char '\r' >> return ()) <?> "end of line"
 
 -- File parser
-parseGrFile :: String -> Either ParseError (String, Map Label Expr)
-parseGrFile grammar = foldToMap <$> contents
+parseGrFile :: String -> String -> Either ParseError (String, Map Label Expr)
+parseGrFile filename grammar = foldToMap <$> contents
   where contents :: Either ParseError [(String, (Label, Expr))]
-        contents = catMaybes <$> parse (grammarLine `sepEndBy` endOfLine) "grammar file" grammar
+        contents = catMaybes <$> parse (grammarLine `sepEndBy` endOfLine) filename grammar
         foldToMap triples = (firsts, folded)
           where firsts = concat $ fst <$> triples
                 folded = foldr (\(label, expr) assoc -> insert label expr assoc) empty $ snd <$> triples

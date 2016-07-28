@@ -110,7 +110,7 @@ matches (Var label) rect = do
       modify $ insert (rect, label) Unknown
       logMsg $ "Checking " ++ show label ++ " at " ++ show rect ++ "\n"
       Just expr <- lift $ asks $ lookup label . clauses
-      match <- matches expr rect
+      match <- withAnchors (const []) $ matches expr rect
       logMsg $ "Checked  " ++ show label ++ " at " ++ show rect ++ ": " ++ show match ++ "\n"
       tell (mempty, Any $ match /= Unknown)
       modify $ insert (rect, label) match
@@ -126,7 +126,7 @@ matches (HPlus expr) r@(x, y, w, h) = whole |? parts
           
 matches (dExp :^ uExp) (x, y, w, h) = anyM [0..h] $ \j ->
   matches dExp (x, y, w, j) &? matches uExp (x, y+j, w, h-j)
-  
+
 matches (VPlus expr) r@(x, y, w, h) = whole |? parts
   where whole = matches expr r
         parts = anyM [1..h-1] $ \j ->
@@ -152,7 +152,7 @@ matches (Sized (x1, x2) (y1, y2) expr) r@(x, y, w, h) = do
 matches (InContext expr) r@(x, y, w, h) = do
   (maxX, maxY) <- asks size
   let surrounding = [(x', y', w', h') | x' <- [0..x], y' <- [0..y],
-                                        w' <- [w..maxX-x'], h' <- [h..maxX-y']]
+                                        w' <- [w+x-x'..maxX-x'], h' <- [h+y-y'..maxY-y']]
   withAnchors (++[r]) $ anyM surrounding $ matches expr
 
 matches (Anchor n) r = do

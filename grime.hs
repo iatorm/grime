@@ -20,7 +20,7 @@ main = do
         ['-':a, b, c] -> (a, b, c)
         [a, b] -> ("", a, b)
         _ -> error "Incorrect arguments. Usage: grime [opts] grammarfile patternfile"
-  parsedGrammar <- fmap parseGrFile $ readFile grFile
+  parsedGrammar <- fmap (parseGrFile grFile) $ readFile grFile
   case parsedGrammar of
     Left parseError -> print parseError
     Right (fileOpts, grammar) -> do
