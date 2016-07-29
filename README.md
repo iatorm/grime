@@ -54,7 +54,7 @@ Expressions are constructed as follows.
 - `$` always matches.
 - `f` matches any 0-height (flat) rectangle, and `t` matches any 0-width (thin) rectangle.
 - The pre-defined character groups are `d`igit, `u`ppercase, `l`owercase, `a`lphabetic, alpha`n`umeric, and `s`ymbol.
-- New character classes can be defined by the syntax `[a-prt-w,d-gu]`. The letters on the left are included, and those on the right are excluded, so this matches exactly the letters `abchijklmnoprtvw`. If the left side is empty, it is taken to contain all characters. The comma can be omitted if the right side is empty. The characters `[],-\` must be escaped with `\`.
+- New character classes can be defined by the syntax `[a-prt-w,d-gu]`. The letters on the left are included, and those on the right are excluded, so this matches exactly the letters `abchijklmnoprtvw`. If the left side is empty, it is taken to contain all characters and the border. The comma can be omitted if the right side is empty. The characters `[],-\` must be escaped with `\`. `\b` matches a border.
 - An unescaped uppercase letter is a nonterminal, and matches the expression it is assigned.
 - `_` is the anonymous toplevel nonterminal.
 - If `P` and `Q` are expressions, then `PQ` is just their horizontal concatenation, and `P/Q` is their vertical concatenation, with `P` on top.

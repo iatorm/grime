@@ -18,7 +18,8 @@ type Range = (Int, Maybe Int)
 data Expr = Border                   -- Matches the rectangle border symbol
           | AnyRect                  -- Mathces any rectangle
           | AnyChar                  -- Matches any single character (not border)
-          | SomeChar Bool (Set Char) -- Matches if flag XOR char in set
+          | SomeChar Bool
+            (Set (Maybe Char))       -- Matches if flag XOR char in set; Nothing matches border
           | Var Label                -- Matches the given variable
           | Expr :> Expr             -- Horizontal concatenation
           | HPlus Expr               -- Horizontal repetition
@@ -37,8 +38,8 @@ instance Show Expr where
   show AnyChar = "."
   show (SomeChar isPos charSet) =
     if isPos
-    then "[p:" ++ toAscList charSet ++ "]"
-    else "[n:" ++ toAscList charSet ++ "]"
+    then "[p:" ++ concatMap (maybe "\\b" $ \c -> if c == '\\' then "\\\\" else [c]) (toAscList charSet) ++ "]"
+    else "[n:" ++ concatMap (maybe "\\b" $ \c -> if c == '\\' then "\\\\" else [c]) (toAscList charSet) ++ "]"
   show (Var Nothing) = "_"
   show (Var (Just a)) = [a]
   show (e1 :> e2) = show e1 ++ show e2

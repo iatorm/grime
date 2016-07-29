@@ -21,7 +21,7 @@ thin :: Expr
 thin = Sized (0, Just 0) (0, Nothing) AnyRect
 
 -- Make a finite character class from string
-mkSomeChar :: Bool -> String -> Expr
+mkSomeChar :: Bool -> [Maybe Char] -> Expr
 mkSomeChar isPos = SomeChar isPos . fromAscList . sort
 
 -- Single-character expressions
@@ -32,19 +32,19 @@ reservedChars = [('$', AnyRect),
                  ('t', thin),
                  ('_', Var Nothing),
                  ('b', Border),
-                 ('d', mkSomeChar True ['0'..'9']),
-                 ('u', mkSomeChar True ['A'..'Z']),
-                 ('l', mkSomeChar True ['a'..'z']),
-                 ('a', mkSomeChar True $ ['A'..'Z'] ++ ['a'..'z']),
-                 ('n', mkSomeChar True $ ['0'..'9'] ++ ['A'..'Z'] ++ ['a'..'z']),
-                 ('s', mkSomeChar True $ ['!'..'/'] ++ [':'..'@'] ++ ['['..'`'] ++ ['{'..'~'])]
+                 ('d', mkSomeChar True $ map Just ['0'..'9']),
+                 ('u', mkSomeChar True $ map Just ['A'..'Z']),
+                 ('l', mkSomeChar True $ map Just ['a'..'z']),
+                 ('a', mkSomeChar True $ map Just $ ['A'..'Z'] ++ ['a'..'z']),
+                 ('n', mkSomeChar True $ map Just $ ['0'..'9'] ++ ['A'..'Z'] ++ ['a'..'z']),
+                 ('s', mkSomeChar True $ map Just $ ['!'..'/'] ++ [':'..'@'] ++ ['['..'`'] ++ ['{'..'~'])]
 
 -- Parse an escaped literal
 escapedLit :: Parsec String () Expr
 escapedLit = do
   char '\\'
   c <- anyChar
-  return $ mkSomeChar True [c]
+  return $ mkSomeChar True $ [Just c]
 
 -- Parse a nonterminal
 nonterm :: Parsec String () Expr
@@ -62,20 +62,21 @@ reserved = do
 -- Parse a character class
 charClass :: Parsec String () Expr
 charClass = char '[' `between` char ']' $ do
-  include <- many $ try classRange <|> pure <$> classChar
-  maybeExclude <- optionMaybe $ char ',' >> (many $ try classRange <|> pure <$> classChar)
+  include <- many $ try classRange <|> try border <|> pure <$> Just <$> classChar
+  maybeExclude <- optionMaybe $ char ',' >> (many $ try classRange <|> try border <|> pure <$> Just <$> classChar)
   return $ case (null include, maybeExclude) of
-    (True, Nothing) -> AnyChar
+    (True, Nothing) -> mkSomeChar False []
     (False, Nothing) -> mkSomeChar True $ concat include
     (True, Just exclude) -> mkSomeChar False $ concat exclude
     (False, Just exclude) -> mkSomeChar True $ concat include \\ concat exclude
   where needsEscape = "[]-,\\"
         classChar = noneOf needsEscape <|> (char '\\' >> oneOf needsEscape)
+        border = string "\\b" >> return [Nothing]
         classRange = do
           a <- classChar
           char '-'
           b <- classChar
-          return [a..b]
+          return $ map Just [a..b]
 
 -- Parse a numeric range
 numRange :: Parsec String () Range

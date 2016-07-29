@@ -97,9 +97,7 @@ matches AnyChar _ = return NoMatch
 
 matches (SomeChar isPos cs) (x, y, 1, 1) = do
   ch <- lift $ asks $ lookup (x, y) . matrix
-  return $ case ch of
-      Just c -> if (c `member` cs) == isPos then Match else NoMatch
-      Nothing -> NoMatch
+  return $ if (ch `member` cs) == isPos then Match else NoMatch
 matches (SomeChar _ _) _ = return NoMatch
 
 matches (Var label) rect = do
