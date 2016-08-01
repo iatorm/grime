@@ -156,7 +156,7 @@ has both an unbroken horizontal line and unbroken vertical line.
 Grime contains several atomic expressions that are built into the language.
 We list some of them here.
 
-- The dot `.` is equivalent to `[]`; it matches any single character.
+- The dot `.` is equivalent to `[]`; it matches any single character.<sup>2</sup>
 - The dollar `$` is a "wildcard" that matches all rectangles, regardless of size or content.
 - The letter `f` (called "flat") matches all rectangles of height 0, and `t` (called "thin") matches all rectangles of width 0.
 - There are six built-in character classes: `d`igit, `u`ppercase, `l`owercase, `a`lphabetic, alpha`n`umeric, and `s`ymbol. They all work in the ASCII range only.
@@ -167,13 +167,13 @@ We also have the zero-or-more-repetitions operators `E*` (equivalent to `t|E+`) 
 
 ## Containment
 
-The operator `#` denotes containment: `E#` matches any pattern that contains a match of `E` as a sub-pattern.
+The operator `#` denotes _containment_: `E#` matches any pattern that contains a match of `E` as a sub-pattern.
 For example, `(\a\b/\b\a)#` matches a pattern that contains a copy of
 
     ab
 	ba
 
-The idiom `E#!` denotes _forbidden patterns_, and it is surprisingly powerful.
+The idiom `E#!` denotes _forbidden patterns_ (it's a combination of containment and logical negation), and it is surprisingly powerful.
 For example, consider the task of matching an arbitrary-sized "chessboard" of `a`s and `b`s, like this:
 
     abababa
@@ -210,7 +210,7 @@ In particular, for character literals `\a*/*` is equivalent to `\a{}`.
 
 ## Nonterminals
 
-Nonterminals in Grime are used for two purposes: as shorthands for long expressions, and to implement recursion.
+_Nonterminals_ in Grime are used for two purposes: as shorthands for long expressions, and to implement recursion.
 A nonterminal is denoted by an uppercase letter, and it must be defined on a separate line in the grammar file.
 The syntax for defining a nonterminal, in this case `A`, is this:
 
@@ -271,8 +271,48 @@ You can define very complex grammars using nonterminals whose definitions refer 
 >
 >     (())[()([])]
 
-## Contect Brackets
+## Context Brackets
 
-_TODO_
+_Context brackets_ provide a method for matching a rectangle depending on its surroundings.
+The syntax consists of the angle brackets `<>`: the expression `<E>` is read as "in context `E`", and it matches any rectangle **r** that's contained in a larger rectangle that matches `E`.
+For example, consider the definition `A=<\a\b+\a>`.
+In the one-dimensional string `abbcabba`, the first `b` does not match `A`, since it's not contained in a run of `b`s surrounded by `a`s.
+However, the third `b` is, and so it does match `A`.
+
+Inside a context bracket, the currently-matched rectangle **r** can be explicitly matched by an _anchor_, which by default is the digit `0`.
+For example, the expression `<0\a>` matches any rectangle that has a single `a` as its right neighbor (and thus has height 1).
+With nested context brackets, the anchor of the bracket at nesting level `n` is the digit `n`, up to level `9`.
+
+Context brackets can be used for many things, but an very useful application is path-finding.
+Consider the following problem: we have a grid consisting of the characters `SE#.`, and we want to count the number of `S`s that are connected to an `E` by a path of `.`s.
+In the grid
+
+    ..#.#..E#
+	S.#...###
+	....#....
+	###.#.##.
+	.S##..#S.
+	....###.#
+
+the bottom left `S` should not be counted, while the other two should.
+We can achieve this with the following grammar:
+
+    R=\E|[S.]&<0R|R0|0/R|R/0>
+	n`R&\S
+
+The nonterminal `R` matches any non-`#` character that contains a path to an `E`: it is either an `E` itself, or one of `S` or `.` that has a match of `R` as a neighbor.
+It should be noted that anchors have lexical scope, so you cannot match an anchor "through" a nonterminal.
+
+> ### Excercise
+>
+> Write a grammar that counts the number of `a`s that have occurrences of `b`s in all four cardinal directions (not necessarily as nearest neighbors).
+> The left `a` here is an example, but the right one is not, so the correct result is `1`:
+>
+>     xxbxxxx
+>     bxaxxbx
+>     bxxxxax
+>     xbbxxbx
 
 <sup>1</sup> This is not entirely true, as character classes are given special treatement by the size constraint operator. We'll return to that later.
+
+<sup>2</sup> This is not entirely true either, since `[]` can also match special _border characters_.
