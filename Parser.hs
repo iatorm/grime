@@ -1,14 +1,14 @@
 module Parser (parseGrFile, parseMatFile, validOpts) where
 
 import Expression
+import PrattParser
 import Data.Maybe (catMaybes)
 import Data.List ((\\), sort)
 import Data.Set (fromAscList)
 import Data.Map.Strict (Map, empty, insert, fromList)
 import Control.Applicative((<$>), (<*), pure)
-import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy, notFollowedBy)
+import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy, notFollowedBy, lookAhead)
 import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
-import Text.Parsec.Expr
 
 -- Usable option characters
 validOpts :: String
@@ -107,28 +107,28 @@ anchor = do
 
 -- Parse an expression
 expression :: Parsec String () Expr
-expression = buildExpressionParser opTable term <?> "expression"
+expression = mkPrattParser opTable term <?> "expression"
   where term = parenthesized <|> inContext <|> anchor <|> nonterm <|> reserved <|> escapedLit <|> charClass <?> "term"
         parenthesized = char '(' `between` char ')' $ expression
         inContext = char '<' `between` char '>' $ InContext <$> expression
-        opTable = [[Postfix $ try $ postfix <* char '^'],
-                   [Infix (return (:>) <* char '^') AssocLeft],
-                   [Infix (try $ string "/^" >> return (:^)) AssocLeft],
-                   [Infix (try $ string " ^" >> return (:>)) AssocLeft],
-                   [Infix (try $ string "&^" >> return (:&)) AssocLeft],
-                   [Infix (try $ string "|^" >> return (:|)) AssocLeft],
-                   [Postfix $ try $ postfix <* notFollowedBy (oneOf "^v")],
-                   [Infix (notFollowedBy (oneOf "^v") >> return (:>)) AssocLeft],
-                   [Infix (try $ char '/' >> notFollowedBy (oneOf "^v") >> return (:^)) AssocLeft],
-                   [Infix (try $ char ' ' >> notFollowedBy (oneOf "^v") >> return (:>)) AssocLeft],
-                   [Infix (try $ char '&' >> notFollowedBy (oneOf "^v") >> return (:&)) AssocLeft],
-                   [Infix (try $ char '|' >> notFollowedBy (oneOf "^v") >> return (:|)) AssocLeft],
-                   [Postfix $ try $ postfix <* char 'v'],
-                   [Infix (return (:>) <* char 'v') AssocLeft],
-                   [Infix (try $ string "/v" >> return (:^)) AssocLeft],
-                   [Infix (try $ string " v" >> return (:>)) AssocLeft],
-                   [Infix (try $ string "&v" >> return (:&)) AssocLeft],
-                   [Infix (try $ string "|v" >> return (:|)) AssocLeft]]
+        opTable = [[Postfix $ try $ char '^' >> postfix],
+                   [InfixL  $ try$ char '^' >> lookAhead term >> return (:>)],
+                   [InfixL  $ try $ string "^/" >> lookAhead term >> return (:^)],
+                   [InfixL  $ try $ string "^ " >> return (:>)],
+                   [InfixL  $ try $ string "^&" >> return (:&)],
+                   [InfixL  $ try $ string "^|" >> return (:|)],
+                   [Postfix $ try $ postfix],
+                   [InfixL  $ try $lookAhead term >> return (:>)],
+                   [InfixL  $ try $ char '/' >> lookAhead term >> return (:^)],
+                   [InfixL  $ char ' ' >> return (:>)],
+                   [InfixL  $ char '&' >> return (:&)],
+                   [InfixL  $ char '|' >> return (:|)],
+                   [Postfix $ try $ char 'v' >> postfix],
+                   [InfixL  $ try $ char 'v' >> lookAhead term >> return (:>)],
+                   [InfixL  $ try $ string "v/" >> lookAhead term >> return (:^)],
+                   [InfixL  $ try $ string "v " >> return (:>)],
+                   [InfixL  $ try $ string "v&" >> return (:&)],
+                   [InfixL  $ try $ string "v|" >> return (:|)]]
         postfixes = [sizeConstr,
                      char '?' >> return (thin :|),
                      try (string "/?") >> return (flat :|),
