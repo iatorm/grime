@@ -36,7 +36,8 @@ By default, the interpreter prints the first match it finds, but this can be con
 - `-p`: print also the positions of the matches, in the format `(x,y,w,h)`.
 - `-s`: do not print the matches themselves.
 - `-b`: include borders of width 1.
-- `-d`: print debug information.
+- `-d` or `-d0`: print debug information.
+- `-d1`: print logs from the matcher.
 
 These can be inserted from the command line, or in the beginning of any line of a grammar file, separated from the rest of the line by a backtick `` ` ``.
 

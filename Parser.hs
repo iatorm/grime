@@ -1,4 +1,4 @@
-module Parser (parseGrFile, parseMatFile, validOpts) where
+module Parser (Option(..), parseGrFile, parseMatFile, parseOptions) where
 
 import Expression
 import PrattParser
@@ -10,9 +10,28 @@ import Control.Applicative((<$>), (<*), pure)
 import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy, notFollowedBy, lookAhead)
 import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
 
--- Usable option characters
-validOpts :: String
-validOpts = "abdenps"
+-- Command-line and grammar options
+data Option = Entire
+            | Number
+            | AllMatches
+            | Positions
+            | Patterns
+            | AddBorder
+            | Debug0
+            | Debug1
+            deriving (Show, Eq)
+
+-- Parse a string of options
+options :: Parsec String () [Option]
+options = concat <$> many (choice option)
+  where option = [char 'e' >> return [Entire],
+                  char 'n' >> return [Number],
+                  char 'a' >> return [AllMatches],
+                  char 'p' >> return [Positions],
+                  char 's' >> return [Patterns],
+                  char 'b' >> return [AddBorder],
+                  try $ string "d1" >> return [Debug0, Debug1],
+                  char 'd' >> optionMaybe (char '0') >> return [Debug0]]
 
 -- Special expressions
 flat :: Expr
@@ -144,9 +163,9 @@ expression = mkPrattParser opTable term <?> "expression"
         contains expr = AnyRect :^ (AnyRect :> expr :> AnyRect) :^ AnyRect
 
 -- Parse a line of a grammar file into options, label, and expression
-contentLine :: Parsec String () (String, (Label, Expr))
+contentLine :: Parsec String () ([Option], (Label, Expr))
 contentLine = do
-  opts <- try (oneOf validOpts `manyTill` char '`') <|> return ""
+  opts <- try (options <* char '`') <|> return []
   label <- optionMaybe $ try (upper <* char '=')
   expr <- expression
   return (opts, (label, expr))
@@ -159,7 +178,7 @@ commentLine = do
   return ()
 
 -- Parse either a content line or a comment
-grammarLine :: Parsec String () (Maybe (String, (Label, Expr)))
+grammarLine :: Parsec String () (Maybe ([Option], (Label, Expr)))
 grammarLine = try (commentLine >> return Nothing) <|> (Just <$> contentLine)
 
 -- Skip an end of line
@@ -170,9 +189,9 @@ endOfLine =
   (char '\r' >> return ()) <?> "end of line"
 
 -- File parser
-parseGrFile :: String -> String -> Either ParseError (String, Map Label Expr)
+parseGrFile :: String -> String -> Either ParseError ([Option], Map Label Expr)
 parseGrFile filename grammar = foldToMap <$> contents
-  where contents :: Either ParseError [(String, (Label, Expr))]
+  where contents :: Either ParseError [([Option], (Label, Expr))]
         contents = catMaybes <$> parse (grammarLine `sepEndBy` endOfLine) filename grammar
         foldToMap triples = (firsts, folded)
           where firsts = concat $ fst <$> triples
@@ -185,3 +204,9 @@ parseMatFile s = ((w, h), fromList pairs)
         pairs = [((x, y), c) | (y, row) <- zip [0..] rows, (x, c) <- zip [0..] row]
         w = maximum $ map length rows
         h = length rows
+
+-- Parse a chain of options form a string
+parseOptions :: String -> [Option]
+parseOptions str = case parse options "" str of
+  Right result -> result
+  Left _ -> []
