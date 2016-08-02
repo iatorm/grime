@@ -7,7 +7,7 @@ import Data.List ((\\), sort)
 import Data.Set (fromAscList)
 import Data.Map.Strict (Map, empty, insert, fromList)
 import Control.Applicative((<$>), (<*), pure)
-import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy, notFollowedBy, lookAhead)
+import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy, notFollowedBy, lookAhead, eof)
 import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
 
 -- Command-line and grammar options
@@ -192,7 +192,7 @@ endOfLine =
 parseGrFile :: String -> String -> Either ParseError ([Option], Map Label Expr)
 parseGrFile filename grammar = foldToMap <$> contents
   where contents :: Either ParseError [([Option], (Label, Expr))]
-        contents = catMaybes <$> parse (grammarLine `sepEndBy` endOfLine) filename grammar
+        contents = catMaybes <$> parse (grammarLine `sepEndBy` endOfLine <* eof) filename grammar
         foldToMap triples = (firsts, folded)
           where firsts = concat $ fst <$> triples
                 folded = foldr (\(label, expr) assoc -> insert label expr assoc) empty $ snd <$> triples
@@ -202,7 +202,7 @@ parseMatFile :: String -> (Size, Map Coord Char)
 parseMatFile s = ((w, h), fromList pairs)
   where rows = lines s
         pairs = [((x, y), c) | (y, row) <- zip [0..] rows, (x, c) <- zip [0..] row]
-        w = maximum $ map length rows
+        w = maximum $ 0 : map length rows
         h = length rows
 
 -- Parse a chain of options form a string
