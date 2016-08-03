@@ -68,6 +68,9 @@ Expressions are constructed as follows.
 - `<P>` is a _context bracket_. It matches any rectangle **r** that's contained in a larger rectangle that matches `P`. The rectangle **r** can be matched by a digit in `P`; this is `0` by default, and increases with the nesting depth.
 
 You can add the prefix `^` to any infix operator or chain of postfix operators to raise its precedence higher than all other operators, or `v` to lower it; for example, `\a\b^|\cv+` is parsed as `(\a(\b|\c))+`.
+Double quotes `""` are used for swapping the `\`-escaped status of all characters inside them, except for the characters `"\/`.
+They allow text grids like `"this/is a/grid"`, and a trailing `"` is always unnecessary.
+Note that quotes do not define syntax elements, so `"ab\(c"+/\d)` will be parsed as `\a\b(\c+/\d)`.
 Lines beginning with `|` are comments, and the parser ignores them.
 
 ## Notes

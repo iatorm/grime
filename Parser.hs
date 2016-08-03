@@ -7,7 +7,8 @@ import Data.List ((\\), sort)
 import Data.Set (fromAscList)
 import Data.Map.Strict (Map, empty, insert, fromList)
 import Control.Applicative((<$>), (<*), pure)
-import Text.Parsec (Parsec, ParseError, parse, try, (<?>), (<|>), between, many, manyTill, many1, choice, optionMaybe, sepEndBy, notFollowedBy, lookAhead, eof)
+import Text.Parsec (Parsec, ParseError, parse, runParser, try, (<?>), (<|>), between, many, manyTill, many1,
+                    choice, optionMaybe, sepEndBy, notFollowedBy, lookAhead, eof, modifyState, getState)
 import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
 
 -- Command-line and grammar options
@@ -23,7 +24,7 @@ data Option = Entire
 
 -- Parse a string of options
 options :: Parsec String () [Option]
-options = concat <$> many (choice option)
+options = concat <$> many (choice option) <?> "option string"
   where option = [char 'e' >> return [Entire],
                   char 'n' >> return [Number],
                   char 'a' >> return [AllMatches],
@@ -32,6 +33,24 @@ options = concat <$> many (choice option)
                   char 'b' >> return [AddBorder],
                   try $ string "d1" >> return [Debug0, Debug1],
                   char 'd' >> optionMaybe (char '0') >> return [Debug0]]
+                  
+-- Parse a string with quotes, return a string without them
+quoted :: Parsec String Bool String
+quoted = concat <$> many (quote <|> escQuote <|> slash <|> escSlash <|> escBackslash <|> maybeEscaped)
+  where quote = char '"' >> modifyState not >> return []
+        escQuote = try $ string "\\\""
+        slash = char '/' >> return "/"
+        escSlash = try $ string "\\/"
+        escBackslash = try $ string "\\\\"
+        maybeEscaped = do
+          inQuote <- getState
+          maybeEscape <- optionMaybe $ char '\\'
+          symbol <- anyChar
+          case (inQuote, maybeEscape) of
+            (False, Just _) -> return $ '\\' : [symbol]
+            (False, Nothing) -> return [symbol]
+            (True, Just _) -> return [symbol]
+            (True, Nothing) -> return $ '\\' : [symbol]
 
 -- Special expressions
 flat :: Expr
@@ -192,7 +211,9 @@ endOfLine =
 parseGrFile :: String -> String -> Either ParseError ([Option], Map Label Expr)
 parseGrFile filename grammar = foldToMap <$> contents
   where contents :: Either ParseError [([Option], (Label, Expr))]
-        contents = catMaybes <$> parse (grammarLine `sepEndBy` endOfLine <* eof) filename grammar
+        contents = do
+          unquoted <- runParser quoted False filename grammar
+          catMaybes <$> parse (grammarLine `sepEndBy` endOfLine <* eof) filename unquoted
         foldToMap triples = (firsts, folded)
           where firsts = concat $ fst <$> triples
                 folded = foldr (\(label, expr) assoc -> insert label expr assoc) empty $ snd <$> triples
