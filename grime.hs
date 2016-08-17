@@ -9,9 +9,14 @@ import Control.Monad (forM_, when)
 import System.Environment (getArgs)
 
 
--- Take a submatrix of a newline-delimited string
-submatrix :: Rect -> String -> String
-submatrix (x, y, w, h) = unlines . take h . drop y . map (take w . drop x) . lines
+-- Take a submatrix of a newline-delimited string, possibly with border
+submatrix :: Bool -> Rect -> String -> String
+submatrix border (x, y, w, h) = unlines . take h . drop y' . map (take w . drop x') . addBorder . lines
+  where addBorder matrix = if border
+                           then let blankRow = replicate (maximum $ map length matrix) ' '
+                                in blankRow : map (\row -> ' ' : row ++ " ") matrix ++ [blankRow]
+                           else matrix
+        (x', y') = if border then (x+1, y+1) else (x, y)
 
 main :: IO ()
 main = do
@@ -27,7 +32,7 @@ main = do
       pict <- readFile matFile
       let opts = [opt | opt <- nub $ cmdOpts ++ fileOpts, elem opt cmdOpts /= elem opt fileOpts]
           (sze@(wMat, hMat), mat) = parseMatFile pict
-          (minX, minY, numX, numY) = if elem AddBorder opts then (-1, -1, wMat+1, hMat+1) else (0, 0, wMat, hMat)
+          (minX, minY, numX, numY) = if elem AddBorder opts then (-1, -1, wMat+2, hMat+2) else (0, 0, wMat, hMat)
           (matches, logs) = matchAllEmpty sze mat grammar $
                             if elem Entire opts
                             then [(minX, minY, numX, numY)]
@@ -46,4 +51,4 @@ main = do
         then print $ length finalMatches
         else forM_ finalMatches $ \rect -> do
         when (elem Positions opts) $ print rect
-        when (not $ elem Patterns opts) . putStrLn $ submatrix rect pict
+        when (not $ elem Patterns opts) . putStrLn $ submatrix (elem AddBorder opts) rect pict
