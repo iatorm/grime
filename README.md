@@ -61,7 +61,7 @@ Expressions are constructed as follows.
 - If `P` and `Q` are expressions, then `PQ` is just their horizontal concatenation, and `P/Q` is their vertical concatenation, with `P` on top.
 - `P Q` is like `PQ`, but with lower precedence than `/`. This sometimes saves parentheses.
 - `P+` is one or more `P`s aligned horizontally, and `P/+` is the same aligned vertically.
-- The Boolean operations are denoted `P|Q`, `P&Q` and `P!`.
+- The Boolean operations are denoted `P|Q`, `P&Q` and `P!`. Boolean equivalence is `P~Q`.
 - `P?` is shorthand for `t|P`, `P/?` for `f|P`, `P*` for `t|P+`, and `P/*` for `f|P/+`.
 - `P#` matches any rectangle that contains a match of `P`.
 - `P{a-b,c-d}`, where `abcd` are nonnegative integers, is a _size constraint_ on `P`. If `P` is a character class, then the expression matches any `mxn` rectangle containing only those characters, provided that `m` is between `a` and `b` inclusive, and `n` is between `c` and `d` inclusive. In other cases, the expression matches any rectangle that has the correct size and that `P` also matches. If `a` or `c` are omitted, they are taken to be `0`, and if `b` or `d` are omitted, they are infinite. If the hyphen between `a` and `b` is omitted, then we use the same number for both ends of the interval. If the entire `c-d` part is omitted, both axes are constrained. To clarify, `{-b}` is equivalent to `{0-b,0-b}`, and `{a-,c}` is equivalent to `{a-infinity,c-c}`.

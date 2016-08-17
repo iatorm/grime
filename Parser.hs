@@ -33,7 +33,7 @@ options = concat <$> many (choice option) <?> "option string"
                   char 'b' >> return [AddBorder],
                   try $ string "d1" >> return [Debug0, Debug1],
                   char 'd' >> optionMaybe (char '0') >> return [Debug0]]
-                  
+
 -- Parse a string with quotes, return a string without them
 quoted :: Parsec String Bool String
 quoted = concat <$> many (quote <|> escQuote <|> slash <|> escSlash <|> escBackslash <|> maybeEscaped)
@@ -155,18 +155,21 @@ expression = mkPrattParser opTable term <?> "expression"
                    [InfixL  $ try $ string "^ " >> return (:>)],
                    [InfixL  $ try $ string "^&" >> return (:&)],
                    [InfixL  $ try $ string "^|" >> return (:|)],
+                   [InfixL  $ try $ string "^~" >> return (:~)],
                    [Postfix $ try $ postfix],
                    [InfixL  $ try $lookAhead term >> return (:>)],
                    [InfixL  $ try $ char '/' >> lookAhead term >> return (:^)],
                    [InfixL  $ char ' ' >> return (:>)],
                    [InfixL  $ char '&' >> return (:&)],
                    [InfixL  $ char '|' >> return (:|)],
+                   [InfixL  $ char '~' >> return (:~)],
                    [Postfix $ try $ char 'v' >> postfix],
                    [InfixL  $ try $ char 'v' >> lookAhead term >> return (:>)],
                    [InfixL  $ try $ string "v/" >> lookAhead term >> return (:^)],
                    [InfixL  $ try $ string "v " >> return (:>)],
                    [InfixL  $ try $ string "v&" >> return (:&)],
-                   [InfixL  $ try $ string "v|" >> return (:|)]]
+                   [InfixL  $ try $ string "v|" >> return (:|)],
+                   [InfixL  $ try $ string "v~" >> return (:~)]]
         postfixes = [sizeConstr,
                      char '?' >> return (thin :|),
                      try (string "/?") >> return (flat :|),

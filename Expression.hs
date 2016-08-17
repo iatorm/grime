@@ -27,6 +27,7 @@ data Expr = Border                   -- Matches the rectangle border symbol
           | VPlus Expr               -- Vertical repetition
           | Expr :| Expr             -- Disjunction
           | Expr :& Expr             -- Conjunction
+          | Expr :~ Expr             -- Equivalence (logical)
           | Not Expr                 -- Negation
           | Sized Range Range Expr   -- Size range
           | InContext Expr           -- Context brackets
@@ -48,6 +49,7 @@ instance Show Expr where
   show (VPlus e) = "(" ++ show e ++ ")/+"
   show (e1 :| e2) = "(" ++ show e1 ++ "|" ++ show e2 ++ ")"
   show (e1 :& e2) = "(" ++ show e1 ++ "&" ++ show e2 ++ ")"
+  show (e1 :~ e2) = "(" ++ show e1 ++ "~" ++ show e2 ++ ")"
   show (Not e) = "(" ++ show e ++ ")!"
   show (Sized (x1,x2) (y1,y2) e) =
     show e ++ "{" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"

@@ -134,6 +134,14 @@ matches (exp1 :| exp2) rect = matches exp1 rect |? matches exp2 rect
 
 matches (exp1 :& exp2) rect = matches exp1 rect &? matches exp2 rect
 
+matches (exp1 :~ exp2) rect = do
+  first <- matches exp1 rect
+  second <- matches exp2 rect
+  return $ case (first, second) of
+    (Unknown, _) -> Unknown
+    (_, Unknown) -> Unknown
+    _            -> if first == second then Match else NoMatch
+
 matches (Not expr) rect = invert <$> matches expr rect
 
 matches (Sized (x1, x2) (y1, y2) expr) r@(x, y, w, h) = do
