@@ -8,7 +8,7 @@ import Data.Set (fromAscList)
 import Data.Map.Strict (Map, empty, insert, fromList)
 import Control.Applicative((<$>), (<*), pure)
 import Text.Parsec (Parsec, ParseError, parse, runParser, try, (<?>), (<|>), between, many, manyTill, many1,
-                    choice, optionMaybe, sepEndBy, notFollowedBy, lookAhead, eof, modifyState, getState)
+                    choice, optionMaybe, sepEndBy, notFollowedBy, lookAhead, eof, getState, putState)
 import Text.Parsec.Char (char, oneOf, noneOf, anyChar, string, upper, digit)
 
 -- Command-line and grammar options
@@ -34,14 +34,27 @@ options = concat <$> many (choice option) <?> "option string"
                   try $ string "d1" >> return [Debug0, Debug1],
                   char 'd' >> optionMaybe (char '0') >> return [Debug0]]
 
+-- Parse an end of line
+endOfLine :: Parsec String s String
+endOfLine = try (string "\r\n") <|> (pure <$> oneOf "\n\r") <?> "end of line"
+
 -- Parse a string with quotes, return a string without them
 quoted :: Parsec String Bool String
-quoted = concat <$> many (quote <|> escQuote <|> slash <|> escSlash <|> escBackslash <|> maybeEscaped)
-  where quote = char '"' >> modifyState not >> return []
+quoted = concat <$> many (quote <|> escQuote <|> slash <|> escSlash <|> escBackslash <|> newLine <|> maybeEscaped)
+  where quote = do
+          char '"'
+          inQuote <- getState
+          putState $ not inQuote
+          return "\""
         escQuote = try $ string "\\\""
         slash = char '/' >> return "/"
         escSlash = try $ string "\\/"
         escBackslash = try $ string "\\\\"
+        newLine = do
+          eol <- endOfLine
+          inQuote <- getState
+          putState False
+          return $ if inQuote then "\"" ++ eol else eol
         maybeEscaped = do
           inQuote <- getState
           maybeEscape <- optionMaybe $ char '\\'
@@ -51,6 +64,10 @@ quoted = concat <$> many (quote <|> escQuote <|> slash <|> escSlash <|> escBacks
             (False, Nothing) -> return [symbol]
             (True, Just _) -> return [symbol]
             (True, Nothing) -> return $ '\\' : [symbol]
+
+-- Skip this token, or be at the end of a line
+skipOrEnd :: Parsec String () a -> Parsec String () ()
+skipOrEnd p = (p >> return ()) <|> (lookAhead endOfLine >> return ()) <|> eof
 
 -- Special expressions
 flat :: Expr
@@ -99,7 +116,7 @@ reserved = do
 
 -- Parse a character class
 charClass :: Parsec String () Expr
-charClass = char '[' `between` char ']' $ do
+charClass = char '[' `between` (skipOrEnd $ char ']') $ do
   include <- many $ try classRange <|> try border <|> pure <$> Just <$> classChar
   maybeExclude <- optionMaybe $ char ',' >> (many $ try classRange <|> try border <|> pure <$> Just <$> classChar)
   return $ case (null include, maybeExclude) of
@@ -108,7 +125,7 @@ charClass = char '[' `between` char ']' $ do
     (True, Just exclude) -> mkSomeChar False $ concat exclude
     (False, Just exclude) -> mkSomeChar True $ concat include \\ concat exclude
   where needsEscape = "[]-,\\"
-        classChar = noneOf needsEscape <|> (char '\\' >> oneOf needsEscape)
+        classChar = noneOf (needsEscape ++ "\n\r") <|> (char '\\' >> oneOf needsEscape)
         border = string "\\b" >> return [Nothing]
         classRange = do
           a <- classChar
@@ -130,7 +147,7 @@ numRange = do
 
 -- Parse a size constraint
 sizeConstr :: Parsec String () (Expr -> Expr)
-sizeConstr = char '{' `between` char '}' $ do
+sizeConstr = char '{' `between` (skipOrEnd $ char '}') $ do
   xRange <- numRange
   maybeYRange <- optionMaybe $ char ',' >> numRange
   return $ case maybeYRange of
@@ -146,9 +163,10 @@ anchor = do
 -- Parse an expression
 expression :: Parsec String () Expr
 expression = mkPrattParser opTable term <?> "expression"
-  where term = parenthesized <|> inContext <|> anchor <|> nonterm <|> reserved <|> escapedLit <|> charClass <?> "term"
-        parenthesized = char '(' `between` char ')' $ expression
-        inContext = char '<' `between` char '>' $ InContext <$> expression
+  where term = parenthesized <|> quoted <|> inContext <|> anchor <|> nonterm <|> reserved <|> escapedLit <|> charClass <?> "term"
+        parenthesized = char '(' `between` (skipOrEnd $ char ')') $ expression
+        quoted = char '"' `between` char '"' $ expression
+        inContext = char '<' `between` (skipOrEnd $ char '>') $ InContext <$> expression
         opTable = [[Postfix $ try $ char '^' >> postfix],
                    [InfixL  $ try$ char '^' >> lookAhead term >> return (:>)],
                    [InfixL  $ try $ string "^/" >> lookAhead term >> return (:^)],
@@ -203,20 +221,13 @@ commentLine = do
 grammarLine :: Parsec String () (Maybe ([Option], (Label, Expr)))
 grammarLine = try (commentLine >> return Nothing) <|> (Just <$> contentLine)
 
--- Skip an end of line
-endOfLine :: Parsec String () ()
-endOfLine =
-  (try (string "\r\n") >> return ()) <|>
-  (char '\n' >> return ()) <|>
-  (char '\r' >> return ()) <?> "end of line"
-
 -- File parser
 parseGrFile :: String -> String -> Either ParseError ([Option], Map Label Expr)
 parseGrFile filename grammar = foldToMap <$> contents
   where contents :: Either ParseError [([Option], (Label, Expr))]
         contents = do
           unquoted <- runParser quoted False filename grammar
-          catMaybes <$> parse (grammarLine `sepEndBy` endOfLine <* eof) filename unquoted
+          catMaybes <$> parse (grammarLine `sepEndBy` endOfLine <* eof) ("pre-processed " ++ filename) unquoted
         foldToMap triples = (firsts, folded)
           where firsts = concat $ fst <$> triples
                 folded = foldr (\(label, expr) assoc -> insert label expr assoc) empty $ snd <$> triples

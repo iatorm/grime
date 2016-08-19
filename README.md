@@ -69,8 +69,10 @@ Expressions are constructed as follows.
 
 You can add the prefix `^` to any infix operator or chain of postfix operators to raise its precedence higher than all other operators, or `v` to lower it; for example, `\a\b^|\cv+` is parsed as `(\a(\b|\c))+`.
 Double quotes `""` are used for swapping the `\`-escaped status of all characters inside them, except for the characters `"\/`.
-They allow text grids like `"this/is a/grid"`, and a trailing `"` is always unnecessary.
-Note that quotes do not define syntax elements, so `"ab\(c"+/\d)` will be parsed as `\a\b(\c+/\d)`.
+They allow text grids like `"this/is a/grid"`.
+Non-literal syntax elements, like nonterminals, operations and parentheses, can be used in quoted expressions by escaping them.
+Note that quotes define syntax elements, so `"ab/cd"+/E` will be parsed as `(\a\b/\c\d)+/E`.
+All open parentheses, brackets and quotes are implicitly closed at the end of a line.
 Lines beginning with `|` are comments, and the parser ignores them.
 
 ## Notes
