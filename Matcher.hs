@@ -61,6 +61,7 @@ type Classification = Map (Rect, Label) Match
 data Context = Context {size :: Size,
                         matrix :: Map Coord Char,
                         clauses :: Map Label Expr,
+                        hasBorders :: Bool,
                         anchors :: [Rect]}
             deriving (Show)
 
@@ -156,8 +157,12 @@ matches (Sized (x1, x2) (y1, y2) expr) r@(x, y, w, h) = do
                    matches expr
 
 matches (InContext expr) r@(x, y, w, h) = do
-  (maxX, maxY) <- asks size
-  let surrounding = [(x', y', w', h') | x' <- [0..x], y' <- [0..y],
+  (maxX', maxY') <- asks size
+  addBorders <- asks hasBorders
+  let (minX, maxX, minY, maxY) = if addBorders
+                                 then (-1, maxX'+1, -1, maxY'+1)
+                                 else ( 0,   maxX',  0,   maxY')
+      surrounding = [(x', y', w', h') | x' <- [0..x], y' <- [0..y],
                                         w' <- [w+x-x'..maxX-x'], h' <- [h+y-y'..maxY-y']]
   withAnchors (++[r]) $ anyM surrounding $ matches expr
 
@@ -167,13 +172,14 @@ matches (Anchor n) r = do
 
 -- Collect definite matches of Nothing for the given rectangles, possibly looping until no uncertainty remains.
 -- Also collect logs for debugging.
-matchAllEmpty :: Size -> Map Coord Char -> Map Label Expr -> [Rect] -> ([Rect], String)
-matchAllEmpty size matrix clauses rects = flip evalState empty .
-                                          flip runReaderT context .
-                                          fmap (\(a,(b,_)) -> (a,b)) .
-                                          runWriterT $
-                                          go rects
-  where context = Context {size = size, matrix = matrix, clauses = clauses, anchors = []}
+matchAllEmpty :: Size -> Bool -> Map Coord Char -> Map Label Expr -> [Rect] -> ([Rect], String)
+matchAllEmpty size hasBorders matrix clauses rects =
+  flip evalState empty .
+  flip runReaderT context .
+  fmap (\(a,(b,_)) -> (a,b)) .
+  runWriterT $
+  go rects
+  where context = Context {size = size, matrix = matrix, hasBorders = hasBorders, clauses = clauses, anchors = []}
         selfAndMatch rect = (,) rect <$> matches (Var Nothing) rect
         go :: [Rect] -> Matcher [Rect]
         go currRects = do

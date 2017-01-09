@@ -33,7 +33,7 @@ main = do
       let opts = [opt | opt <- nub $ cmdOpts ++ fileOpts, elem opt cmdOpts /= elem opt fileOpts]
           (sze@(wMat, hMat), mat) = parseMatFile pict
           (minX, minY, numX, numY) = if elem AddBorder opts then (-1, -1, wMat+2, hMat+2) else (0, 0, wMat, hMat)
-          (matches, logs) = matchAllEmpty sze mat grammar $
+          (matches, logs) = matchAllEmpty sze (elem AddBorder opts) mat grammar $
                             if elem Entire opts
                             then [(minX, minY, numX, numY)]
                             else [(x, y, w, h) |
