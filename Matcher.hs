@@ -55,7 +55,7 @@ allM :: (Monad m) => [a] -> (a -> m Match) -> m Match
 allM xs f = foldr (&?) (return Match) $ f <$> xs
 
 -- A memoization of matches
-type Classification = Map (Rect, Label) Match
+type Classification = Map (Rect, D4, Label) Match
 
 -- A changing context for matching in a matrix
 data Context = Context {size :: Size,
@@ -101,18 +101,18 @@ matches (SomeChar isPos cs) (x, y, 1, 1) = do
   return $ if (ch `member` cs) == isPos then Match else NoMatch
 matches (SomeChar _ _) _ = return NoMatch
 
-matches (Var label) rect = do
-  memoed <- gets $ lookup (rect, label)
+matches (Var rot label) rect = do
+  memoed <- gets $ lookup (rect, rot, label)
   case memoed of
     Just b -> return b
     Nothing -> do
-      modify $ insert (rect, label) Unknown
-      logMsg $ "Checking " ++ show label ++ " at " ++ show rect ++ "\n"
+      modify $ insert (rect, rot, label) Unknown
+      logMsg $ "Checking " ++ show rot ++ show label ++ " at " ++ show rect ++ "\n"
       Just expr <- lift $ asks $ lookup label . clauses
-      match <- withAnchors (const []) $ matches expr rect
-      logMsg $ "Checked  " ++ show label ++ " at " ++ show rect ++ ": " ++ show match ++ "\n"
+      match <- withAnchors (const []) $ matches (orient expr rot) rect
+      logMsg $ "Checked  " ++ show rot ++ show label ++ " at " ++ show rect ++ ": " ++ show match ++ "\n"
       tell (mempty, Any $ match /= Unknown)
-      modify $ insert (rect, label) match
+      modify $ insert (rect, rot, label) match
       return match
 
 matches (lExp :> rExp) (x, y, w, h) = anyM [0..w] $ \i ->
@@ -180,7 +180,7 @@ matchAllEmpty size hasBorders matrix clauses rects =
   runWriterT $
   go rects
   where context = Context {size = size, matrix = matrix, hasBorders = hasBorders, clauses = clauses, anchors = []}
-        selfAndMatch rect = (,) rect <$> matches (Var Nothing) rect
+        selfAndMatch rect = (,) rect <$> matches (Var (Rot 0) Nothing) rect
         go :: [Rect] -> Matcher [Rect]
         go currRects = do
           logMsg "Matching...\n"

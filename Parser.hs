@@ -79,13 +79,17 @@ thin = Sized (0, Just 0) (0, Nothing) AnyRect
 mkSomeChar :: Bool -> [Maybe Char] -> Expr
 mkSomeChar isPos = SomeChar isPos . fromAscList . sort
 
+-- Shorthand for nonterminal in standard orientation
+stdVar :: Label -> Expr
+stdVar = Var (Rot 0)
+
 -- Single-character expressions
 reservedChars :: [(Char, Expr)]
 reservedChars = [('$', AnyRect),
                  ('.', AnyChar),
                  ('f', flat),
                  ('t', thin),
-                 ('_', Var Nothing),
+                 ('_', stdVar Nothing),
                  ('b', Border),
                  ('d', mkSomeChar True $ map Just ['0'..'9']),
                  ('u', mkSomeChar True $ map Just ['A'..'Z']),
@@ -105,7 +109,7 @@ escapedLit = do
 nonterm :: Parsec String () Expr
 nonterm = do
   label <- upper
-  return $ Var $ Just label
+  return $ stdVar $ Just label
 
 -- Parse a reserved character
 reserved :: Parsec String () Expr
@@ -154,6 +158,24 @@ sizeConstr = char '{' `between` (skipOrEnd $ char '}') $ do
     Nothing -> Sized xRange xRange
     Just yRange -> Sized xRange yRange
 
+-- Encoding of orientations
+charToD4 :: Char -> D4
+charToD4 'A' = Rot 0
+charToD4 'B' = Rot 1
+charToD4 'C' = Rot 2
+charToD4 'D' = Rot 3
+charToD4 'E' = RefRot 0
+charToD4 'F' = RefRot 1
+charToD4 'G' = RefRot 2
+charToD4 'H' = RefRot 3
+
+-- Parse a set of orientations
+orientationSet :: Parsec String () (Expr -> Expr)
+orientationSet = do
+  char 'o'
+  choices <- many1 $ oneOf "ABCDEFGH"
+  return (\expr -> foldr1 (:|) $ map (\c -> orient expr $ charToD4 c) choices)
+
 -- Parse a context anchor
 anchor :: Parsec String () Expr
 anchor = do
@@ -189,6 +211,7 @@ expression = mkPrattParser opTable term <?> "expression"
                    [InfixL  $ try $ string "v|" >> return (:|)],
                    [InfixL  $ try $ string "v~" >> return (:~)]]
         postfixes = [sizeConstr,
+                     orientationSet,
                      char '?' >> return (thin :|),
                      try (string "/?") >> return (flat :|),
                      char '+' >> return HPlus,
