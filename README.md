@@ -28,6 +28,8 @@ and then run the resulting executable:
 
 	grime [options] grammarfile matrixfile
 
+There's also a bash script `rungrime` that compiles Grime if needed and then calls the executable with the provided arguments.
+
 By default, the interpreter prints the first match it finds, but this can be controlled using the option flags:
 
 - `-e`: match only the entire matrix, print `1` for match and `0` for no match.

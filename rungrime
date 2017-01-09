@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [ ! -f grime ] ||
+   [ Expression.hs -nt grime ] ||
+   [ PrattParser.hs -nt grime ] ||
+   [ Parser.hs -nt grime ] ||
+   [ Matcher.hs -nt grime ] ||
+   [ grime.hs -nt grime ]; then
+   ghc -O2 grime.hs
+fi
+
+./grime $*
