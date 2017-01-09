@@ -3,7 +3,7 @@ module Parser (Option(..), parseGrFile, parseMatFile, parseOptions) where
 import Expression
 import PrattParser
 import Data.Maybe (catMaybes)
-import Data.List ((\\), sort)
+import Data.List ((\\), sort, nub)
 import Data.Set (fromAscList)
 import Data.Map.Strict (Map, empty, insert, fromList)
 import Control.Applicative((<$>), (<*), pure)
@@ -159,22 +159,28 @@ sizeConstr = char '{' `between` (skipOrEnd $ char '}') $ do
     Just yRange -> Sized xRange yRange
 
 -- Encoding of orientations
-charToD4 :: Char -> D4
-charToD4 'A' = Rot 0
-charToD4 'B' = Rot 1
-charToD4 'C' = Rot 2
-charToD4 'D' = Rot 3
-charToD4 'E' = RefRot 0
-charToD4 'F' = RefRot 1
-charToD4 'G' = RefRot 2
-charToD4 'H' = RefRot 3
+charToD4 :: Char -> [D4]
+charToD4 'A' = [Rot 0]
+charToD4 'B' = [Rot 1]
+charToD4 'C' = [Rot 2]
+charToD4 'D' = [Rot 3]
+charToD4 'E' = [RefRot 0]
+charToD4 'F' = [RefRot 1]
+charToD4 'G' = [RefRot 2]
+charToD4 'H' = [RefRot 3]
+charToD4 'O' = [Rot 0, Rot 1, Rot 2, Rot 3, RefRot 0, RefRot 1, RefRot 2, RefRot 3]
+charToD4 'X' = [Rot 0, Rot 1, Rot 2, Rot 3]
+charToD4 'N' = [Rot 0, Rot 2]
+charToD4 'T' = [Rot 0, RefRot 0]
+charToD4 'K' = [Rot 0, RefRot 2]
+
 
 -- Parse a set of orientations
 orientationSet :: Parsec String () (Expr -> Expr)
 orientationSet = do
   char 'o'
-  choices <- many1 $ oneOf "ABCDEFGH"
-  return (\expr -> foldr1 (:|) $ map (\c -> orient expr $ charToD4 c) choices)
+  choices <- many1 $ oneOf "ABCDEFGHOXNTK"
+  return (\expr -> foldr (\rot e -> orient expr rot :| e) expr $ nub $ charToD4 =<< choices)
 
 -- Parse a context anchor
 anchor :: Parsec String () Expr
