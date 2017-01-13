@@ -160,26 +160,28 @@ sizeConstr = char '{' `between` (skipOrEnd $ char '}') $ do
 
 -- Encoding of orientations
 charToD4 :: Char -> [D4]
-charToD4 'A' = [Rot 0]
-charToD4 'B' = [Rot 1]
-charToD4 'C' = [Rot 2]
-charToD4 'D' = [Rot 3]
-charToD4 'E' = [RefRot 0]
-charToD4 'F' = [RefRot 1]
-charToD4 'G' = [RefRot 2]
-charToD4 'H' = [RefRot 3]
+charToD4 '0' = [Rot 0]
+charToD4 '1' = [Rot 1]
+charToD4 '2' = [Rot 2]
+charToD4 '3' = [Rot 3]
+charToD4 '4' = [RefRot 0]
+charToD4 '5' = [RefRot 1]
+charToD4 '6' = [RefRot 2]
+charToD4 '7' = [RefRot 3]
 charToD4 'O' = [Rot 0, Rot 1, Rot 2, Rot 3, RefRot 0, RefRot 1, RefRot 2, RefRot 3]
 charToD4 'X' = [Rot 0, Rot 1, Rot 2, Rot 3]
 charToD4 'N' = [Rot 0, Rot 2]
 charToD4 'T' = [Rot 0, RefRot 0]
 charToD4 'K' = [Rot 0, RefRot 2]
+charToD4 'H' = [Rot 0, RefRot 0, RefRot 2, Rot 2]
 
 
 -- Parse a set of orientations
 orientationSet :: Parsec String () (Expr -> Expr)
 orientationSet = do
   char 'o'
-  choices <- many1 $ oneOf "ABCDEFGHOXNTK"
+  choices <- many1 $ oneOf "01234567OXNTKH"
+  optionMaybe $ char '}'
   return (\expr -> foldr (\rot e -> orient expr rot :| e) expr $ nub $ charToD4 =<< choices)
 
 -- Parse a context anchor
@@ -218,6 +220,7 @@ expression = mkPrattParser opTable term <?> "expression"
                    [InfixL  $ try $ string "v~" >> return (:~)]]
         postfixes = [sizeConstr,
                      orientationSet,
+                     char '\'' >> return Fixed,
                      char '?' >> return (thin :|),
                      try (string "/?") >> return (flat :|),
                      char '+' >> return HPlus,

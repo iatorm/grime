@@ -58,6 +58,7 @@ data Expr = Border                   -- Matches the rectangle border symbol
           | Sized Range Range Expr   -- Size range
           | InContext Expr           -- Context brackets
           | Anchor AnchorLabel       -- Context anchor
+          | Fixed Expr               -- Fixed orientation
 
 instance Show Expr where
   show Border = "b"
@@ -83,6 +84,7 @@ instance Show Expr where
           sy2 = case y2 of Nothing -> ""; Just y -> show y
   show (InContext e) = "<" ++ show e ++ ">"
   show (Anchor n) = show n
+  show (Fixed e) = "(" ++ show e ++ ")'"
 
 -- Rotate and/or reflect an expression
 orient :: Expr -> D4 -> Expr
@@ -121,3 +123,4 @@ orient (Sized (x1,x2) (y1,y2) e) rot =
   else Sized (y1,y2) (x1,x2) $ orient e rot
 orient (InContext e) rot = InContext $ orient e rot
 orient e@(Anchor _) _ = e
+orient e@(Fixed _) _ = e

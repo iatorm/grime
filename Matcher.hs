@@ -170,6 +170,8 @@ matches (Anchor n) r = do
   anchs <- asks anchors
   return $ if anchs !! n == r then Match else NoMatch
 
+matches (Fixed e) r = matches e r
+
 -- Collect definite matches of Nothing for the given rectangles, possibly looping until no uncertainty remains.
 -- Also collect logs for debugging.
 matchAllEmpty :: Size -> Bool -> Map Coord Char -> Map Label Expr -> [Rect] -> ([Rect], String)
