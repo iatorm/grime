@@ -54,6 +54,7 @@ Expressions are constructed as follows.
 - Any character escaped with `\` matches any `1x1` rectangle containing that character.
 - `.` matches any single character.
 - `b` matches a `1x1` rectangle outside the character matrix. It's only relevant if the `-b` option is used, or if the input is not rectangular.
+- `e` matches a 0-height or 0-width segment of the input's edge.
 - `$` always matches.
 - `f` matches any 0-height (flat) rectangle, and `t` matches any 0-width (thin) rectangle.
 - The pre-defined character groups are `d`igit, `u`ppercase, `l`owercase, `a`lphabetic, alpha`n`umeric, and `s`ymbol.

@@ -42,6 +42,7 @@ instance Monoid D4 where
 
 -- An expression that may or may not match a rectangle of characters
 data Expr = Border                   -- Matches the rectangle border symbol
+          | Edge                     -- Matches an edge segment
           | AnyRect                  -- Mathces any rectangle
           | AnyChar                  -- Matches any single character (not border)
           | SomeChar Bool
@@ -63,6 +64,7 @@ data Expr = Border                   -- Matches the rectangle border symbol
 
 instance Show Expr where
   show Border = "b"
+  show Edge = "e"
   show AnyRect = "$"
   show AnyChar = "."
   show (SomeChar isPos charSet) =
@@ -90,6 +92,7 @@ instance Show Expr where
 -- Rotate and/or reflect an expression
 orient :: Expr -> D4 -> Expr
 orient Border _ = Border
+orient Edge _ = Edge
 orient AnyRect _ = AnyRect
 orient AnyChar _ = AnyChar
 orient e@(SomeChar _ _) _ = e

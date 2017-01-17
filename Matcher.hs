@@ -87,6 +87,13 @@ matches Border (x, y, 1, 1) = do
     Just _ -> NoMatch
 matches Border _ = return NoMatch
 
+matches Edge (x, y, w, h) = do
+  (maxX, maxY) <- asks size
+  return $ if (x == 0 || x == maxX) && w == 0 && y >= 0 && y+h <= maxY ||
+              (y == 0 || y == maxY) && h == 0 && x >= 0 && x+w <= maxX
+           then Match
+           else NoMatch
+
 matches AnyRect _ = return Match
 
 matches AnyChar (x, y, 1, 1) = do
