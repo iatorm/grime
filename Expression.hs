@@ -19,12 +19,12 @@ type Range = (Int, Maybe Int)
 -- Rot n is rotation by n*90 degrees
 -- RefRot n is Rot n, then reflection by vertical line
 data D4 = Rot Int | RefRot Int
-  deriving(Eq, Ord)
+  deriving (Eq, Ord)
 
 instance Show D4 where
   show (Rot 0) = ""
-  show (Rot n) = show n ++ "'"
-  show (RefRot n) = "R" ++ show n ++ "'"
+  show (Rot n) = "o" ++ show n
+  show (RefRot n) = "o" ++ show (n + 4)
 
 axisPreserving :: D4 -> Bool
 axisPreserving (Rot 0) = True
@@ -59,6 +59,7 @@ data Expr = Border                   -- Matches the rectangle border symbol
           | InContext Expr           -- Context brackets
           | Anchor AnchorLabel       -- Context anchor
           | Fixed Expr               -- Fixed orientation
+          deriving (Eq)
 
 instance Show Expr where
   show Border = "b"
@@ -68,8 +69,8 @@ instance Show Expr where
     if isPos
     then "[p:" ++ concatMap (maybe "\\b" $ \c -> if c == '\\' then "\\\\" else [c]) (toAscList charSet) ++ "]"
     else "[n:" ++ concatMap (maybe "\\b" $ \c -> if c == '\\' then "\\\\" else [c]) (toAscList charSet) ++ "]"
-  show (Var rot Nothing) = show rot ++ "_"
-  show (Var rot (Just a)) = show rot ++ [a]
+  show (Var rot Nothing) = "_" ++ show rot
+  show (Var rot (Just a)) = [a] ++ show rot
   show (e1 :> e2) = show e1 ++ show e2
   show (HPlus e) = "(" ++ show e ++ ")+"
   show (e1 :^ e2) = "(" ++ show e1 ++ "/" ++ show e2 ++ ")"
@@ -84,7 +85,7 @@ instance Show Expr where
           sy2 = case y2 of Nothing -> ""; Just y -> show y
   show (InContext e) = "<" ++ show e ++ ">"
   show (Anchor n) = show n
-  show (Fixed e) = "(" ++ show e ++ ")'"
+  show (Fixed e) = "(" ++ show e ++ ")oF"
 
 -- Rotate and/or reflect an expression
 orient :: Expr -> D4 -> Expr

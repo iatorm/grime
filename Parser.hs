@@ -174,15 +174,20 @@ charToD4 'N' = [Rot 0, Rot 2]
 charToD4 'T' = [Rot 0, RefRot 0]
 charToD4 'K' = [Rot 0, RefRot 2]
 charToD4 'H' = [Rot 0, RefRot 0, RefRot 2, Rot 2]
-
+charToD4 'A' = [Rot 0, RefRot 1]
+charToD4 'D' = [Rot 0, RefRot 3]
+charToD4 'C' = [Rot 0, RefRot 1, RefRot 3, Rot 2]
+charToD4 'F' = []
 
 -- Parse a set of orientations
 orientationSet :: Parsec String () (Expr -> Expr)
 orientationSet = do
   char 'o'
-  choices <- many1 $ oneOf "01234567OXNTKH"
+  choices <- many1 $ oneOf "01234567OXNTKHADCF"
   optionMaybe $ char '}'
-  return (\expr -> foldr (\rot e -> orient expr rot :| e) expr $ nub $ charToD4 =<< choices)
+  let transformations = \expr ->
+        [Fixed expr | 'F' `elem` choices] ++ nub [orient expr rot | ch <- choices, rot <- charToD4 ch]
+  return $ foldr1 (:|) . transformations
 
 -- Parse a context anchor
 anchor :: Parsec String () Expr
