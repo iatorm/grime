@@ -6,7 +6,8 @@ if [ ! -f grime ] ||
    [ Parser.hs -nt grime ] ||
    [ Matcher.hs -nt grime ] ||
    [ grime.hs -nt grime ]; then
-   ghc -O2 grime.hs
+   >&2 echo "Newer source files detected, compiling."
+   >&2 ghc -O2 grime.hs
 fi
 
 ./grime $*

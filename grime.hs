@@ -7,6 +7,7 @@ import Data.List (nub)
 import Data.Map.Strict (toList)
 import Control.Monad (forM_, when)
 import System.Environment (getArgs)
+import System.IO (hPutStrLn, stderr)
 
 
 -- Take a submatrix of a newline-delimited string, possibly with border
@@ -18,6 +19,10 @@ submatrix border (x, y, w, h) = unlines . take h . drop y' . map (take w . drop 
                            else matrix
         (x', y') = if border then (x+1, y+1) else (x, y)
 
+-- Print a string to STDERR with newline
+printErr :: String -> IO ()
+printErr = hPutStrLn stderr
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -27,7 +32,7 @@ main = do
         _ -> error "Incorrect arguments. Usage: grime [opts] grammarfile patternfile"
   parsedGrammar <- fmap (parseGrFile grFile) $ readFile grFile
   case parsedGrammar of
-    Left parseError -> print parseError
+    Left parseError -> printErr $ show parseError
     Right (fileOpts, grammar) -> do
       pict <- readFile matFile
       let opts = [opt | opt <- nub $ cmdOpts ++ fileOpts, elem opt cmdOpts /= elem opt fileOpts]
@@ -41,12 +46,12 @@ main = do
                                   x <- [minX..numX-w], y <- [minY..numY-h]]
           finalMatches = if elem AllMatches opts || elem Number opts then matches else take 1 matches
       when (elem Debug0 opts) $ do
-        putStrLn $ "Options: " ++ show opts
-        putStrLn $ "Input dimensions: " ++ show sze
-        putStrLn "Definitions:"
+        printErr $ "Options: " ++ show opts
+        printErr $ "Input dimensions: " ++ show sze
+        printErr "Definitions:"
         forM_ (toList grammar) $ \(l, e) ->
-          putStrLn $ " " ++ (case l of Nothing -> "_ = "; Just a -> a:" = ") ++ show e
-        when (elem Debug1 opts) $ putStr logs
+          printErr $ " " ++ (case l of Nothing -> "_ = "; Just a -> a:" = ") ++ show e
+        when (elem Debug1 opts) $ printErr logs
       if (elem Number opts /= elem Entire opts)
         then print $ length finalMatches
         else forM_ finalMatches $ \rect -> do
