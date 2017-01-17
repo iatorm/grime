@@ -10,4 +10,4 @@ if [ ! -f grime ] ||
    >&2 ghc -O2 grime.hs
 fi
 
-./grime $*
+./grime "$@"
