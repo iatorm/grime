@@ -57,6 +57,7 @@ data Expr = Border                   -- Matches the rectangle border symbol
           | Expr :~ Expr             -- Equivalence (logical)
           | Not Expr                 -- Negation
           | Sized Range Range Expr   -- Size range
+          | Grid Range Range Expr    -- Grid of repetitions
           | InContext Expr           -- Context brackets
           | Anchor AnchorLabel       -- Context anchor
           | Fixed Expr               -- Fixed orientation
@@ -83,6 +84,10 @@ instance Show Expr where
   show (Not e) = "(" ++ show e ++ ")!"
   show (Sized (x1,x2) (y1,y2) e) =
     show e ++ "{" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"
+    where sx2 = case x2 of Nothing -> ""; Just x -> show x
+          sy2 = case y2 of Nothing -> ""; Just y -> show y
+  show (Grid (x1,x2) (y1,y2) e) =
+    show e ++ ":" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"
     where sx2 = case x2 of Nothing -> ""; Just x -> show x
           sy2 = case y2 of Nothing -> ""; Just y -> show y
   show (InContext e) = "<" ++ show e ++ ">"
@@ -125,6 +130,10 @@ orient (Sized (x1,x2) (y1,y2) e) rot =
   if axisPreserving rot
   then Sized (x1,x2) (y1,y2) $ orient e rot
   else Sized (y1,y2) (x1,x2) $ orient e rot
+orient (Grid (x1,x2) (y1,y2) e) rot =
+  if axisPreserving rot
+  then Grid (x1,x2) (y1,y2) $ orient e rot
+  else Grid (y1,y2) (x1,x2) $ orient e rot
 orient (InContext e) rot = InContext $ orient e rot
 orient e@(Anchor _) _ = e
 orient e@(Fixed _) _ = e

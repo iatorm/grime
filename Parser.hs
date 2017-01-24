@@ -138,13 +138,13 @@ charClass = char '[' `between` (skipOrEnd $ char ']') $ do
           b <- classChar
           return $ map Just [a..b]
 
--- Parse a numeric range
-numRange :: Parsec String () Range
-numRange = do
+-- Parse a numeric range with default minimum
+numRange :: Int -> Parsec String () Range
+numRange m = do
   lower <- many digit
   maybeDash <- optionMaybe $ char '-'
   upper <- many digit
-  let lowerNum = if null lower then 0 else read lower
+  let lowerNum = if null lower then m else read lower
       upperNum = if null upper then Nothing else Just $ read upper
   return $ case maybeDash of
     Nothing -> (lowerNum, if null lower then Nothing else Just lowerNum)
@@ -153,8 +153,8 @@ numRange = do
 -- Parse a size constraint
 sizeConstr :: Parsec String () (Expr -> Expr)
 sizeConstr = char '{' `between` (skipOrEnd $ char '}') $ do
-  xRange <- numRange
-  maybeYRange <- optionMaybe $ char ',' >> numRange
+  xRange <- numRange 0
+  maybeYRange <- optionMaybe $ char ',' >> numRange 0
   return $ case maybeYRange of
     Nothing -> Sized xRange xRange
     Just yRange -> Sized xRange yRange
@@ -189,6 +189,17 @@ orientationSet = do
   let transformations = \expr ->
         [Fixed expr | 'F' `elem` choices] ++ nub [orient expr rot | ch <- choices, rot <- charToD4 ch]
   return $ foldr1 (:|) . transformations
+
+-- Parse a postfix grid specification
+gridSpec :: Parsec String () (Expr -> Expr)
+gridSpec = do
+  char ':'
+  xRange <- numRange 1
+  maybeYRange <- optionMaybe $ char ',' >> numRange 1
+  optionMaybe $ char '}'
+  return $ case maybeYRange of
+    Nothing -> Grid xRange xRange
+    Just yRange -> Grid xRange yRange
 
 -- Parse a context anchor
 anchor :: Parsec String () Expr
@@ -226,6 +237,7 @@ expression = mkPrattParser opTable term <?> "expression"
                    [InfixL  $ try $ string "v~" >> return (:~)]]
         postfixes = [sizeConstr,
                      orientationSet,
+                     gridSpec,
                      char '\'' >> return Fixed,
                      char '?' >> return (thin :|),
                      try (string "/?") >> return (flat :|),

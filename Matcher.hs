@@ -6,7 +6,7 @@ import Data.Map.Strict (Map, empty, lookup, insert)
 import qualified Data.Map.Strict as Map (filter)
 import Data.Set (member)
 import Data.Monoid (Any(Any), getAny, mempty)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), liftA2)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer.Lazy (WriterT, tell, listens, runWriterT)
 import Control.Monad.Reader (ReaderT, asks, reader, local, runReaderT)
@@ -53,6 +53,9 @@ anyM xs f = foldr (|?) (return NoMatch) $ f <$> xs
 
 allM :: (Monad m) => [a] -> (a -> m Match) -> m Match
 allM xs f = foldr (&?) (return Match) $ f <$> xs
+
+filterMatch :: (Monad m) => [a] -> (a -> m Match) -> m [a]
+filterMatch xs p = foldr (\x -> liftA2 (\match -> if match == Match then (x:) else id) $ p x) (return []) xs
 
 -- A memoization of matches
 type Classification = Map (Rect, D4, Label) Match
@@ -162,6 +165,36 @@ matches (Sized (x1, x2) (y1, y2) expr) r@(x, y, w, h) = do
     _ -> matches expr r
   where allMatch = allM [(x+i, y+j, 1, 1) | i <- [0..w-1], j <- [0..h-1]] $
                    matches expr
+
+-- x1 and y1 are positive
+matches (Grid xr@(x1, x2) yr@(y1, y2) expr) r@(x, y, w, h) = go False False [x] [y]
+  where go :: Bool -> Bool -> [Int] -> [Int] -> Matcher Match
+        go hOverlap vOverlap hs@(hor:hors) vs@(ver:vers)
+          | hor == x+w, ver == y+h, hOverlap || x1 < length hs, vOverlap || y1 < length vs = return Match
+          | Just n <- x2, length hs > n = return NoMatch
+          | Just n <- y2, length vs > n = return NoMatch
+          | otherwise = do
+              let hMin = case () of
+                    _ | x2 == Just (length hs) -> x+w
+                      | hOverlap -> hor+1
+                      | otherwise -> hor
+                  vMin = case () of
+                    _ | y2 == Just (length vs) -> y+h
+                      | vOverlap -> ver+1
+                      | otherwise -> ver
+              hMargin <- filterMatch [hMin .. x+w] $ \newHor ->
+                allM [(hor, v1, newHor-hor, v2-v1) | (v1, v2) <- zip (tail vs) vs] $ matches expr
+              vMargin <- filterMatch [vMin .. y+h] $ \newVer ->
+                allM [(h1, ver, h2-h1, newVer-ver) | (h1, h2) <- zip (tail hs) hs] $ matches expr
+              pairs <- filterMatch [(newH, newV) | newH <- hMargin, newV <- vMargin] $ \(newH, newV) ->
+                matches expr (hor, ver, newH-hor, newV-ver)
+              anyM ([(hs, newVer:vs) | length hs <= length vs, hor == x+w, newVer <- vMargin] ++
+                    [(newHor:hs, vs) | length hs >= length vs, ver == y+h, newHor <- hMargin] ++
+                    [(newHor:hs, newVer:vs) | length hs == length vs, (newHor, newVer) <- pairs]) $ \(newHors, newVers) ->
+                go (hOverlap || overlap newHors) (vOverlap || overlap newVers) newHors newVers
+        overlap (a:b:c) = a == b
+        overlap _ = False
+                                       
 
 matches (InContext expr) r@(x, y, w, h) = do
   (maxX', maxY') <- asks size
