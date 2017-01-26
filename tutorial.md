@@ -271,6 +271,70 @@ You can define very complex grammars using nonterminals whose definitions refer 
 >
 >     (())[()([])]
 
+## Orientation modifiers
+
+Suppose you want to match a rectangle of `0`s with a single `1` in any corner.
+The expression `\1\0+/\0+/+` of course matches such a rectangle with `1` in the upper left corner, but to get them all, you'd need to repeat the pattern four times with slight modifications, which is really cumbersome:
+
+    \1\0+/\0+/+|\0+\1/\0+/+|\0+/+/\1\0+|\0+/+/\0+\1
+
+_Orientation modifiers_, which are postfix operators, allow you to more easily rotate and reflect Grime patterns.
+For example, the modifier `oX` means "rotated by any multiple of 90 degrees", so the above expression can be shortened to `(\1\0+/\0+/+)oX`.
+
+The full syntax of an orientation modifier is `oS}`, where `S` is a nonempty string of the characters `01234567OXNTKHADCF`, and the final `}` is optional.
+Each digit `0123` denotes counterclockwise rotation by the corresponding multiple of 90 degrees, and `4567` are the same followed by reflection around the vertical axis.
+Each of the letters (except `F`) corresponds to a subgroup of rotations and reflections, usually the symmetry group of the glyph itself.
+For example, `O` stands for all rotations and reflections, `X` for all rotations, and `N` for rotation by 0 or 180 degrees.
+The exceptions are `D` (nothing or reflection around diagonal), `A` (nothing or reflection around anti-diagonal) and `C` (nothing or reflection around diagonal and/or anti-diagonal).
+If `S` contains several characters, they are combined with disjunctions (logical OR).
+For example, `oN4` would mean no change, rotation by 180 degrees or reflection around vertical axis.
+
+The `F` option is special, and stands for _fixed orientation_.
+Sometimes you want to rotate a pattern as a whole, but keep some things unchanged.
+For example, you might want to match the patterns `()` and `[]` side by side or on top of one another, in any orientation.
+However, the pattern `(\(\)\[\])oX` is not what we want, since it matches the following rectanges:
+
+    ()[]
+    
+    ]
+    [
+    )
+    (
+
+    ][)(
+    
+    (
+    )
+    [
+    ]
+
+What we can do is to fix the patterns `()` and `[]` with the `F` option, and rotate the rest of the expression around them: `((\(\))oF(\[\])oF)oX`.
+This correctly matches the following rectangles:
+
+    ()[]
+
+    []
+    ()
+
+    []()
+
+    ()
+    []
+
+> ### Excercise
+>
+> Write a grammar that matches a rectangular "track" lined by `#`-characters with one "runner" represented by `@` at any point of the track, on a background or `.`-characters, like this:
+>
+>     ##########
+>     #........#
+>     #.######.#
+>     #@#....#.#
+>     #.#....#.#
+>     #.######.#
+>     #........#
+>     ##########
+
+
 ## Context Brackets
 
 _Context brackets_ provide a method for matching a rectangle depending on its surroundings.
@@ -297,10 +361,10 @@ In the grid
 the bottom left `S` should not be counted, while the other two should.
 We can achieve this with the following grammar:
 
-    R=\E|[S.]&<0R|R0|0/R|R/0>
+    R=\E|[S.]&<(0R)oX>
 	n`R&\S
 
-The nonterminal `R` matches any non-`#` character that contains a path to an `E`: it is either an `E` itself, or one of `S` or `.` that has a match of `R` as a neighbor.
+The nonterminal `R` matches any non-`#` character that contains a path to an `E`: it is either an `E` itself, or one of `S` or `.` that has a match of `R` as a neighbor in any direction (which we achieve with an orientation modifier).
 It should be noted that anchors have lexical scope, so you cannot match an anchor "through" a nonterminal.
 
 > ### Excercise
