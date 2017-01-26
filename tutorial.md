@@ -159,6 +159,7 @@ We list some of them here.
 - The dot `.` is equivalent to `[]`; it matches any single character.<sup>2</sup>
 - The dollar `$` is a "wildcard" that matches all rectangles, regardless of size or content.
 - The letter `f` (called "flat") matches all rectangles of height 0, and `t` (called "thin") matches all rectangles of width 0.
+- The letter `e` matches any flat or thin rectangle on the border of the input.
 - There are six built-in character classes: `d`igit, `u`ppercase, `l`owercase, `a`lphabetic, alpha`n`umeric, and `s`ymbol. They all work in the ASCII range only.
 
 Some operators are defined in terms of these expressions.
@@ -186,6 +187,8 @@ We could construct an expression by repeating the pattern `\a\b/\b\a` and taking
 A much simpler approach is to match a rectangle of `a`s and `b`s that contains no adjacent characters:
 
     [ab]+/+&(\a\a|\a/\a|\b\b|\b/\b)#!
+
+As another example, if `P` is an arbitrary expression, then `P&e#` matches any rectangle that touches an edge of the input and is a match of `P`.
 
 ## Size Constraints
 
@@ -288,6 +291,9 @@ For example, `O` stands for all rotations and reflections, `X` for all rotations
 The exceptions are `D` (nothing or reflection around diagonal), `A` (nothing or reflection around anti-diagonal) and `C` (nothing or reflection around diagonal and/or anti-diagonal).
 If `S` contains several characters, they are combined with disjunctions (logical OR).
 For example, `oN4` would mean no change, rotation by 180 degrees or reflection around vertical axis.
+Using the `A` option for reflecting around the andi-diagonal, the chessboard example above can be shortened to
+
+    [ab]+/+&(\a\a|\b\b)oA#!
 
 The `F` option is special, and stands for _fixed orientation_.
 Sometimes you want to rotate a pattern as a whole, but keep some things unchanged.
