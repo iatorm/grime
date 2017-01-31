@@ -351,7 +351,8 @@ However, the third `b` is, and so it does match `A`.
 
 Inside a context bracket, the currently-matched rectangle **r** can be explicitly matched by an _anchor_, which by default is the digit `0`.
 For example, the expression `<0\a>` matches any rectangle that has a single `a` as its right neighbor (and thus has height 1).
-With nested context brackets, the anchor of the bracket at nesting level `n` is the digit `n`, up to level `9`.
+With nested context brackets, the anchor of the `n`th surrounding bracket is the digit `n`, up to `9`.
+This means that the anchor of the innermost bracket is always matched with `0`.
 
 Context brackets can be used for many things, but an very useful application is path-finding.
 Consider the following problem: we have a grid consisting of the characters `SE#.`, and we want to count the number of `S`s that are connected to an `E` by a path of `.`s.
@@ -367,10 +368,10 @@ In the grid
 the bottom left `S` should not be counted, while the other two should.
 We can achieve this with the following grammar:
 
-    R=\E|[S.]&<(0R)oX>
+    R=\E|[S.]&<(0RoF)oX>
 	n`R&\S
 
-The nonterminal `R` matches any non-`#` character that contains a path to an `E`: it is either an `E` itself, or one of `S` or `.` that has a match of `R` as a neighbor in any direction (which we achieve with an orientation modifier).
+The nonterminal `R` matches any non-`#` character that contains a path to an `E`: it is either an `E` itself, or one of `S` or `.` that has a match of `R` as a neighbor in any direction (which we achieve with an orientation modifier; the `oF` fixes the orientation of `R`, which doesn't change the semantics, but speeds up the matching).
 It should be noted that anchors have lexical scope, so you cannot match an anchor "through" a nonterminal.
 
 > ### Excercise

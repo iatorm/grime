@@ -204,7 +204,7 @@ matches (InContext expr) r@(x, y, w, h) = do
                                  else ( 0,   maxX',  0,   maxY')
       surrounding = [(x', y', w', h') | x' <- [0..x], y' <- [0..y],
                                         w' <- [w+x-x'..maxX-x'], h' <- [h+y-y'..maxY-y']]
-  withAnchors (++[r]) $ anyM surrounding $ matches expr
+  withAnchors (r:) $ anyM surrounding $ matches expr
 
 matches (Anchor n) r = do
   anchs <- asks anchors
