@@ -127,19 +127,9 @@ matches (Var rot label) rect = do
 
 matches (lExp :> rExp) (x, y, w, h) = anyM [0..w] $ \i ->
   matches lExp (x, y, i, h) &? matches rExp (x+i, y, w-i, h)
-  
-matches (HPlus expr) r@(x, y, w, h) = whole |? parts
-  where whole = matches expr r
-        parts = anyM [1..w-1] $ \i ->
-          matches expr (x, y, i, h) &? matches (HPlus expr) (x+i, y, w-i, h)
           
 matches (dExp :^ uExp) (x, y, w, h) = anyM [0..h] $ \j ->
   matches dExp (x, y, w, j) &? matches uExp (x, y+j, w, h-j)
-
-matches (VPlus expr) r@(x, y, w, h) = whole |? parts
-  where whole = matches expr r
-        parts = anyM [1..h-1] $ \j ->
-          matches expr (x, y, w, j) &? matches (VPlus expr) (x, y+j, w, h-j)
           
 matches (exp1 :| exp2) rect = matches exp1 rect |? matches exp2 rect
 
@@ -166,32 +156,33 @@ matches (Sized (x1, x2) (y1, y2) expr) r@(x, y, w, h) = do
   where allMatch = allM [(x+i, y+j, 1, 1) | i <- [0..w-1], j <- [0..h-1]] $
                    matches expr
 
--- x1 and y1 are positive
-matches (Grid xr@(x1, x2) yr@(y1, y2) expr) r@(x, y, w, h) = go False False [x] [y]
-  where go :: Bool -> Bool -> [Int] -> [Int] -> Matcher Match
-        go hOverlap vOverlap hs@(hor:hors) vs@(ver:vers)
-          | hor == x+w, ver == y+h, hOverlap || x1 < length hs, vOverlap || y1 < length vs = return Match
-          | Just n <- x2, length hs > n = return NoMatch
-          | Just n <- y2, length vs > n = return NoMatch
+matches (Grid (0, _) _ _) (_, _, 0, _) = return Match
+matches (Grid _ (0, _) _) (_, _, _, 0) = return Match
+matches (Grid xr@(x1, x2) yr@(y1, y2) expr) r@(x, y, w, h) = go False False 0 0 [x] [y]
+  where go :: Bool -> Bool -> Int -> Int -> [Int] -> [Int] -> Matcher Match
+        go hOverlap vOverlap numH numV hs@(hor:hors) vs@(ver:vers)
+          | Just n <- x2, numH > n = return NoMatch
+          | Just n <- y2, numV > n = return NoMatch
+          | hor == x + w, ver == y + h, hOverlap || x1 <= numH, vOverlap || y1 <= numV = return Match
           | otherwise = do
               let hMin = case () of
-                    _ | x2 == Just (length hs) -> x+w
-                      | hOverlap -> hor+1
+                    _ | x2 == Just (numH + 1) -> x+w
+                      | hOverlap -> hor + 1
                       | otherwise -> hor
                   vMin = case () of
-                    _ | y2 == Just (length vs) -> y+h
-                      | vOverlap -> ver+1
+                    _ | y2 == Just (numV + 1) -> y+h
+                      | vOverlap -> ver + 1
                       | otherwise -> ver
               hMargin <- filterMatch [hMin .. x+w] $ \newHor ->
                 allM [(hor, v1, newHor-hor, v2-v1) | (v1, v2) <- zip (tail vs) vs] $ matches expr
               vMargin <- filterMatch [vMin .. y+h] $ \newVer ->
                 allM [(h1, ver, h2-h1, newVer-ver) | (h1, h2) <- zip (tail hs) hs] $ matches expr
-              pairs <- filterMatch [(newH, newV) | newH <- hMargin, newV <- vMargin] $ \(newH, newV) ->
+              pairs <- filterMatch [(newH, newV) | numH == numV, newH <- hMargin, newV <- vMargin] $ \(newH, newV) ->
                 matches expr (hor, ver, newH-hor, newV-ver)
-              anyM ([(hs, newVer:vs) | length hs <= length vs, hor == x+w, newVer <- vMargin] ++
-                    [(newHor:hs, vs) | length hs >= length vs, ver == y+h, newHor <- hMargin] ++
-                    [(newHor:hs, newVer:vs) | length hs == length vs, (newHor, newVer) <- pairs]) $ \(newHors, newVers) ->
-                go (hOverlap || overlap newHors) (vOverlap || overlap newVers) newHors newVers
+              anyM ([(numH, numV+1, hs, newVer:vs) | numH <= numV, hor == x+w, newVer <- vMargin] ++
+                    [(numH+1, numV, newHor:hs, vs) | numH >= numV, ver == y+h, newHor <- hMargin] ++
+                    [(numH+1, numV+1, newHor:hs, newVer:vs) | (newHor, newVer) <- pairs]) $ \(newNumH, newNumV, newHors, newVers) ->
+                go (hOverlap || overlap newHors) (vOverlap || overlap newVers) newNumH newNumV newHors newVers
         overlap (a:b:c) = a == b
         overlap _ = False
                                        

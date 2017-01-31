@@ -49,9 +49,7 @@ data Expr = Border                   -- Matches the rectangle border symbol
             (Set (Maybe Char))       -- Matches if flag XOR char in set; Nothing matches border
           | Var D4 Label             -- Matches the given oriented variable
           | Expr :> Expr             -- Horizontal concatenation
-          | HPlus Expr               -- Horizontal repetition
           | Expr :^ Expr             -- Vertical concatenation
-          | VPlus Expr               -- Vertical repetition
           | Expr :| Expr             -- Disjunction
           | Expr :& Expr             -- Conjunction
           | Expr :~ Expr             -- Exclusive OR
@@ -75,9 +73,7 @@ instance Show Expr where
   show (Var rot Nothing) = "_" ++ show rot
   show (Var rot (Just a)) = [a] ++ show rot
   show (e1 :> e2) = show e1 ++ show e2
-  show (HPlus e) = "(" ++ show e ++ ")+"
   show (e1 :^ e2) = "(" ++ show e1 ++ "/" ++ show e2 ++ ")"
-  show (VPlus e) = "(" ++ show e ++ ")/+"
   show (e1 :| e2) = "(" ++ show e1 ++ "|" ++ show e2 ++ ")"
   show (e1 :& e2) = "(" ++ show e1 ++ "&" ++ show e2 ++ ")"
   show (e1 :~ e2) = "(" ++ show e1 ++ "~" ++ show e2 ++ ")"
@@ -87,7 +83,7 @@ instance Show Expr where
     where sx2 = case x2 of Nothing -> ""; Just x -> show x
           sy2 = case y2 of Nothing -> ""; Just y -> show y
   show (Grid (x1,x2) (y1,y2) e) =
-    show e ++ ":" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"
+    "(" ++ show e ++ "):" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"
     where sx2 = case x2 of Nothing -> ""; Just x -> show x
           sy2 = case y2 of Nothing -> ""; Just y -> show y
   show (InContext e) = "<" ++ show e ++ ">"
@@ -111,7 +107,6 @@ orient e@(e1 :> e2) rot = case rot of
   RefRot 1 -> orient e2 rot :^ orient e1 rot
   RefRot 2 -> orient e1 rot :> orient e2 rot
   RefRot 3 -> orient e1 rot :^ orient e2 rot
-orient (HPlus e) rot = (if axisPreserving rot then HPlus else VPlus) $ orient e rot
 orient e@(e1 :^ e2) rot = case rot of
   Rot 0 -> e
   Rot 1 -> orient e1 rot :> orient e2 rot
@@ -121,7 +116,6 @@ orient e@(e1 :^ e2) rot = case rot of
   RefRot 1 -> orient e2 rot :> orient e1 rot
   RefRot 2 -> orient e2 rot :^ orient e1 rot
   RefRot 3 -> orient e1 rot :> orient e2 rot
-orient (VPlus e) rot = (if axisPreserving rot then VPlus else HPlus) $ orient e rot
 orient (e1 :| e2) rot = orient e1 rot :| orient e2 rot
 orient (e1 :& e2) rot = orient e1 rot :& orient e2 rot
 orient (e1 :~ e2) rot = orient e1 rot :~ orient e2 rot
