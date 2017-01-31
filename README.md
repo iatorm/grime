@@ -67,7 +67,7 @@ Expressions are constructed as follows.
 - The Boolean operations are denoted `P|Q`, `P&Q` and `P!`. Boolean equivalence is `P~Q`.
 - `P?` is shorthand for `t|P`, `P/?` for `f|P`, `P*` for `t|P+`, and `P/*` for `f|P/+`.
 - `P#` matches any rectangle that contains a match of `P`.
-- `P{a-b,c-d}`, where `abcd` are nonnegative integers, is a _size constraint_ on `P`. If `P` is a character class, then the expression matches any `mxn` rectangle containing only those characters, provided that `m` is between `a` and `b` inclusive, and `n` is between `c` and `d` inclusive. In other cases, the expression matches any rectangle that has the correct size and that `P` also matches. If `a` or `c` are omitted, they are taken to be `0`, and if `b` or `d` are omitted, they are infinite. If the hyphen between `a` and `b` is omitted, then we use the same number for both ends of the interval. If the entire `c-d` part is omitted, both axes are constrained. To clarify, `{-b}` is equivalent to `{0-b,0-b}`, and `{a-,c}` is equivalent to `{a-infinity,c-c}`.
+- `P{a-b,c-d}`, where `abcd` are nonnegative integers, is a _size constraint_ on `P`. If `P` is a character class, then the expression matches any `mxn` rectangle containing only those characters, provided that `m` is between `a` and `b` inclusive, and `n` is between `c` and `d` inclusive. In other cases, the expression matches any rectangle that has the correct size and that `P` also matches. If `a` or `c` are omitted, they are taken to be `0`, and if `b` or `d` are omitted, they are infinite. If the hyphen between `a` and `b` is omitted, then we use the same number for both ends of the interval. If the entire `c-d` part is omitted, both axes are constrained. To clarify, `{-b}` is equivalent to `{0-b,0-b}`, and `{a-,c}` is equivalent to `{a-infinity,c-c}`. The `}` can be omitted.
 - `P:a-b,c-d}` is a _grid specifier_. It matches a rectangle that can be divided into an `mxn` grid of matches of `P`, where `m` is between `a` and `b` inclusive, and `n` is between `c` and `d` inclusive. The ranges and `}` can be omitted, with the same defaulting behavior as in the size constraint, except that the beginning of a range defaults to `1` instead of `0`.
 - `PoS`, where `S` is a (greedily parsed) string of the characters `01234567`, optionally terminated with `}`, is an _orientation modifier_. Each of the characters stands for a rotation (`0123`) or reflection (`4567`), which is applied to the expression `P`. The transformed expressions are combined with Boolean disjunctions. The characters `OXNTKHADC` encode convenient classes of orientations. The character `F` fixes an expression, so that its orientation cannot be modified.
 - `<P>` is a _context bracket_. It matches any rectangle **r** that's contained in a larger rectangle that matches `P`. The rectangle **r** can be matched by a digit in `P`; this is `0` by default, and increases with the nesting depth.
@@ -86,7 +86,7 @@ Grime does allow paradoxical definitions of the form `A=A!`; these will result i
 In general, the matching engine can resolve any grammar where no match of a single nonterminal on a single rectangle depends on itself (although for complex grammars, this can take a while).
 A nontrivial example of a resolvable grammar is
 
-    A=\a|E\a
+    A=E?\a
     B=[ab]+&A!
     E=A|B
     a`A

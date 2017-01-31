@@ -150,14 +150,22 @@ numRange m = do
     Nothing -> (lowerNum, if null lower then Nothing else Just lowerNum)
     Just _ -> (lowerNum, upperNum)
 
--- Parse a size constraint
-sizeConstr :: Parsec String () (Expr -> Expr)
-sizeConstr = char '{' `between` (skipOrEnd $ char '}') $ do
+-- Parse two numeric ranges with default minima
+numRange2D :: Int -> Parsec String () (Range, Range)
+numRange2D m = do
   xRange <- numRange 0
   maybeYRange <- optionMaybe $ char ',' >> numRange 0
   return $ case maybeYRange of
-    Nothing -> Sized xRange xRange
-    Just yRange -> Sized xRange yRange
+    Nothing -> (xRange, xRange)
+    Just yRange -> (xRange, yRange)
+
+-- Parse a size constraint
+sizeConstr :: Parsec String () (Expr -> Expr)
+sizeConstr = do
+  char '{'
+  (xRange, yRange) <- numRange2D 0
+  optionMaybe $ char '}'
+  return $ Sized xRange yRange
 
 -- Encoding of orientations
 charToD4 :: Char -> [D4]
@@ -194,12 +202,9 @@ orientationSet = do
 gridSpec :: Parsec String () (Expr -> Expr)
 gridSpec = do
   char ':'
-  xRange <- numRange 1
-  maybeYRange <- optionMaybe $ char ',' >> numRange 1
+  (xRange, yRange) <- numRange2D 1
   optionMaybe $ char '}'
-  return $ case maybeYRange of
-    Nothing -> Grid xRange xRange
-    Just yRange -> Grid xRange yRange
+  return $ Grid xRange yRange
 
 -- Parse a context anchor
 anchor :: Parsec String () Expr
