@@ -54,7 +54,7 @@ data Expr = Border                   -- Matches the rectangle border symbol
           | VPlus Expr               -- Vertical repetition
           | Expr :| Expr             -- Disjunction
           | Expr :& Expr             -- Conjunction
-          | Expr :~ Expr             -- Equivalence (logical)
+          | Expr :~ Expr             -- Exclusive OR
           | Not Expr                 -- Negation
           | Sized Range Range Expr   -- Size range
           | Grid Range Range Expr    -- Grid of repetitions

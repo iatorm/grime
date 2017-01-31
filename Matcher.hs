@@ -151,7 +151,7 @@ matches (exp1 :~ exp2) rect = do
   return $ case (first, second) of
     (Unknown, _) -> Unknown
     (_, Unknown) -> Unknown
-    _            -> if first == second then Match else NoMatch
+    _            -> if first /= second then Match else NoMatch
 
 matches (Not expr) rect = invert <$> matches expr rect
 
