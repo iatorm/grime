@@ -56,6 +56,7 @@ data Expr = Border                   -- Matches the rectangle border symbol
           | Not Expr                 -- Negation
           | Sized Range Range Expr   -- Size range
           | Grid Range Range Expr    -- Grid of repetitions
+          | Count Range Expr         -- Count number of matches
           | InContext Expr           -- Context brackets
           | Anchor AnchorLabel       -- Context anchor
           | Fixed Expr               -- Fixed orientation
@@ -79,13 +80,16 @@ instance Show Expr where
   show (e1 :~ e2) = "(" ++ show e1 ++ "~" ++ show e2 ++ ")"
   show (Not e) = "(" ++ show e ++ ")!"
   show (Sized (x1,x2) (y1,y2) e) =
-    show e ++ "{" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"
+    "(" ++ show e ++ "){" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"
     where sx2 = case x2 of Nothing -> ""; Just x -> show x
           sy2 = case y2 of Nothing -> ""; Just y -> show y
   show (Grid (x1,x2) (y1,y2) e) =
     "(" ++ show e ++ "):" ++ show x1 ++ "-" ++ sx2 ++ "," ++ show y1 ++ "-" ++ sy2 ++ "}"
     where sx2 = case x2 of Nothing -> ""; Just x -> show x
           sy2 = case y2 of Nothing -> ""; Just y -> show y
+  show (Count (low, high) e) =
+    "(" ++ show e ++ ")#" ++ show low ++ "-" ++ showHigh ++ "}"
+    where showHigh = case high of Nothing -> ""; Just n -> show n
   show (InContext e) = "<" ++ show e ++ ">"
   show (Anchor n) = show n
   show (Fixed e) = "(" ++ show e ++ ")oF"
@@ -128,6 +132,7 @@ orient (Grid (x1,x2) (y1,y2) e) rot =
   if axisPreserving rot
   then Grid (x1,x2) (y1,y2) $ orient e rot
   else Grid (y1,y2) (x1,x2) $ orient e rot
+orient (Count range e) rot = Count range $ orient e rot
 orient (InContext e) rot = InContext $ orient e rot
 orient e@(Anchor _) _ = e
 orient e@(Fixed _) _ = e

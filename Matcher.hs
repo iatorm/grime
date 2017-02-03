@@ -185,7 +185,23 @@ matches (Grid xr@(x1, x2) yr@(y1, y2) expr) r@(x, y, w, h) = go False False 0 0 
                 go (hOverlap || overlap newHors) (vOverlap || overlap newVers) newNumH newNumV newHors newVers
         overlap (a:b:c) = a == b
         overlap _ = False
-                                       
+
+matches (Count (low, high) expr) (x, y, w, h) = go 0 0 total allRects
+  where go :: Int -> Int -> Int -> [Rect] -> Matcher Match
+        go match unk left _ | match >= low, Nothing <- high = return Match
+                            | match >= low, Just n <- high, n >= match + left + unk = return Match
+                            | match + unk + left < low = return NoMatch
+                            | match + left < low = return Unknown
+                            | Just n <- high, match > n = return NoMatch
+        go match unk left [] = error "Unreachable state."
+        go match unk left (r:rs) = do
+          matchR <- matches expr r
+          case matchR of
+            Match -> go (match+1) unk (left-1) rs
+            NoMatch -> go match unk (left-1) rs
+            Unknown -> go match (unk+1) (left-1) rs
+        total = (w+2)*(w+1)*(h+2)*(h+1) `div` 4
+        allRects = [(x', y', w', h') | w' <- [0..w], h' <- [0..h], x' <- [x..x+w-w'], y' <- [y..y+h-h']]
 
 matches (InContext expr) r@(x, y, w, h) = do
   (maxX', maxY') <- asks size

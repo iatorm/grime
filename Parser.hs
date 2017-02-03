@@ -206,6 +206,14 @@ gridSpec = do
   optionMaybe $ char '}'
   return $ Grid xRange yRange
 
+-- Parse a counting specification
+countSpec :: Parsec String () (Expr -> Expr)
+countSpec = do
+  char '#'
+  range <- numRange 1
+  optionMaybe $ char '}'
+  return $ Count range
+  
 -- Parse a context anchor
 anchor :: Parsec String () Expr
 anchor = do
@@ -243,15 +251,15 @@ expression = mkPrattParser opTable term <?> "expression"
         postfixes = [sizeConstr,
                      orientationSet,
                      gridSpec,
+                     countSpec,
                      char '\'' >> return Fixed,
                      char '?' >> return (thin :|),
                      try (string "/?") >> return (flat :|),
                      char '+' >> return (Grid (1, Nothing) (1, Just 1)),
                      try (string "/+") >> return (Grid (1, Just 1) (1, Nothing)),
-                     char '*' >> return (\e -> thin :| HPlus e),
-                     try (string "/*") >> return (\e -> flat :| VPlus e),
-                     char '!' >> return Not,
-                     char '#' >> return contains]
+                     char '*' >> return (Grid (0, Nothing) (1, Just 1)),
+                     try (string "/*") >> return (Grid (1, Just 1) (0, Nothing)),
+                     char '!' >> return Not]
         postfix = do
           operations <- many1 $ choice postfixes
           return $ foldr1 (flip (.)) operations
