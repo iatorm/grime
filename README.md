@@ -73,6 +73,7 @@ Expressions are constructed as follows.
 - `<P>` is a _context bracket_. It matches any rectangle **r** that's contained in a larger rectangle that matches `P`. The rectangle **r** can be matched by a digit in `P`; this is `0` by default, and increases with the nesting depth (`0` matches the anchor of the innermost brackets, `1` the next one etc).
 
 You can add the prefix `^` to any infix operator or chain of postfix operators to raise its precedence higher than all other operators, or `v` to lower it; for example, `\a\b^|\cv+` is parsed as `(\a(\b|\c))+`.
+If `i` is any infix operator apart from concatenation or `/`, and `p` a chain of postfix operators, then `PipQ` is a shorthand for `(PiQ)p`; for example, `\a|+\b` is equivalent to `(\a|\b)+`.
 Double quotes `""` are used for swapping the `\`-escaped status of all characters inside them, except for the characters `"\/`.
 They allow text grids like `"this/is a/grid"`.
 Non-literal syntax elements, like nonterminals, operations and parentheses, can be used in quoted expressions by escaping them.

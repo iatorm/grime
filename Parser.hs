@@ -227,30 +227,33 @@ expression = mkPrattParser opTable term <?> "expression"
         parenthesized = char '(' `between` (skipOrEnd $ char ')') $ expression
         quoted = char '"' `between` char '"' $ expression
         inContext = char '<' `between` (skipOrEnd $ char '>') $ InContext <$> expression
-        opTable = [[Postfix $ try $ char '^' >> postfix],
-                   [InfixR  $ try $ char '^' >> lookAhead term >> return (:>)],
-                   [InfixR  $ try $ string "^/" >> lookAhead term >> return (:^)],
-                   [InfixR  $ try $ string "^ " >> return (:>)],
-                   [InfixR  $ try $ string "^&" >> return (:&)],
-                   [InfixR  $ try $ string "^⁻" >> return (\e1 e2 -> e1 :& Not e2)],
-                   [InfixR  $ try $ string "^|" >> return (:|)],
-                   [InfixR  $ try $ string "^~" >> return (:~)],
-                   [Postfix $ try $ postfix],
-                   [InfixR  $ try $lookAhead term >> return (:>)],
-                   [InfixR  $ try $ char '/' >> lookAhead term >> return (:^)],
-                   [InfixR  $ char ' ' >> return (:>)],
-                   [InfixR  $ char '&' >> return (:&)],
-                   [InfixR  $ char '-' >> return (\e1 e2 -> e1 :& Not e2)],
-                   [InfixR  $ char '|' >> return (:|)],
-                   [InfixR  $ char '~' >> return (:~)],
-                   [Postfix $ try $ char 'v' >> postfix],
-                   [InfixR  $ try $ char 'v' >> lookAhead term >> return (:>)],
-                   [InfixR  $ try $ string "v/" >> lookAhead term >> return (:^)],
-                   [InfixR  $ try $ string "v " >> return (:>)],
-                   [InfixR  $ try $ string "v&" >> return (:&)],
-                   [InfixR  $ try $ string "v⁻" >> return (\e1 e2 -> e1 :& Not e2)],
-                   [InfixR  $ try $ string "v|" >> return (:|)],
-                   [InfixR  $ try $ string "v~" >> return (:~)]]
+        opTable = [[Postfix $ try $ char '^' >> postfix]] ++
+                  map (return . InfixR . addPostfix . try)
+                   [char '^' >> lookAhead term >> return (:>),
+                    string "^/" >> lookAhead term >> return (:^),
+                    string "^ " >> return (:>),
+                    string "^&" >> return (:&),
+                    string "^⁻" >> return (\e1 e2 -> e1 :& Not e2),
+                    string "^|" >> return (:|),
+                    string "^~" >> return (:~)] ++
+                  [[Postfix $ try $ postfix]] ++
+                  map (return . InfixR . addPostfix . try)
+                   [lookAhead term >> return (:>),
+                    char '/' >> lookAhead term >> return (:^),
+                    char ' ' >> return (:>),
+                    char '&' >> return (:&),
+                    char '-' >> return (\e1 e2 -> e1 :& Not e2),
+                    char '|' >> return (:|),
+                    char '~' >> return (:~)] ++
+                  [[Postfix $ try $ char 'v' >> postfix]] ++
+                  map (return . InfixR . addPostfix . try)
+                   [char 'v' >> lookAhead term >> return (:>),
+                    string "v/" >> lookAhead term >> return (:^),
+                    string "v " >> return (:>),
+                    string "v&" >> return (:&),
+                    string "v⁻" >> return (\e1 e2 -> e1 :& Not e2),
+                    string "v|" >> return (:|),
+                    string "v~" >> return (:~)]
         postfixes = [sizeConstr,
                      orientationSet,
                      gridSpec,
@@ -266,7 +269,13 @@ expression = mkPrattParser opTable term <?> "expression"
         postfix = do
           operations <- many1 $ choice postfixes
           return $ foldr1 (flip (.)) operations
-        contains expr = AnyRect :^ (AnyRect :> expr :> AnyRect) :^ AnyRect
+        addPostfix :: Parsec String () (Expr -> Expr -> Expr) -> Parsec String () (Expr -> Expr -> Expr)
+        addPostfix parseOp = do
+          op <- parseOp
+          pfix <- optionMaybe postfix
+          return $ case pfix of
+            Just p -> \e1 e2 -> p $ op e1 e2
+            Nothing -> op
 
 -- Parse a line of a grammar file into options, label, and expression
 contentLine :: Parsec String () ([Option], (Label, Expr))
