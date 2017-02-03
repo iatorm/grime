@@ -8,6 +8,7 @@ import Control.Applicative (pure, (<*>))
 
 data Operator t = Postfix (Parsec String () (t -> t))
                 | InfixL (Parsec String () (t -> t -> t)) -- Left associative
+                | InfixR (Parsec String () (t -> t -> t)) -- Right associative
 
 -- Make a Pratt parser from a precedence table and a term parser
 -- Precedence table is given from highest to lowest precedence
@@ -19,9 +20,10 @@ mkPrattParser precTable parseTerm = parseExpr precs
           parseOper operators term
         parseOper operators lhs = choice stepParsers <|> return lhs                            -- Choose an operator; if fails, return lhs
           where stepParsers = do
-                  (precLev : higherPrecs) <- tails operators                                   -- Choose a precedence level and all higher levels
+                  newPrecs@(precLev : higherPrecs) <- tails operators                          -- Choose a precedence level and all higher levels
                   operator <- precLev                                                          -- Choose an operator from the level
                   stepParser <- case operator of                                               -- Make a "next step" parser
                     Postfix parseOp -> return $ parseOp <*> pure lhs                           -- For postfix, just grab that
-                    InfixL parseOp -> return $ parseOp <*> pure lhs <*> parseExpr higherPrecs  -- For infix, grab everything with higher precedence
+                    InfixL parseOp -> return $ parseOp <*> pure lhs <*> parseExpr higherPrecs  -- For left infix, grab everything with higher precedence
+                    InfixR parseOp -> return $ parseOp <*> pure lhs <*> parseExpr newPrecs     -- For right infix, grab everything with same or higher precedence
                   return $ stepParser >>= parseOper operators                                  -- Parse with "next step", then with all operators
