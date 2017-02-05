@@ -227,33 +227,20 @@ expression = mkPrattParser opTable term <?> "expression"
         parenthesized = char '(' `between` (skipOrEnd $ char ')') $ expression
         quoted = char '"' `between` char '"' $ expression
         inContext = char '<' `between` (skipOrEnd $ char '>') $ InContext <$> expression
+        basicInfixes = [lookAhead term >> return (:>),
+                        char '/' >> lookAhead term >> return (:^)] ++
+                       map addPostfix
+                       [char ' ' >> return (:>),
+                        char '&' >> return (:&),
+                        char '-' >> return (\e1 e2 -> e1 :& Not e2),
+                        char '|' >> return (:|),
+                        char '~' >> return (:~)]
         opTable = [[Postfix $ try $ char '^' >> postfix]] ++
-                  map (return . InfixR . addPostfix . try)
-                   [char '^' >> lookAhead term >> return (:>),
-                    string "^/" >> lookAhead term >> return (:^),
-                    string "^ " >> return (:>),
-                    string "^&" >> return (:&),
-                    string "^⁻" >> return (\e1 e2 -> e1 :& Not e2),
-                    string "^|" >> return (:|),
-                    string "^~" >> return (:~)] ++
+                  map (return . InfixR . try . (char '^' >>)) basicInfixes ++
                   [[Postfix $ try $ postfix]] ++
-                  map (return . InfixR . addPostfix . try)
-                   [lookAhead term >> return (:>),
-                    char '/' >> lookAhead term >> return (:^),
-                    char ' ' >> return (:>),
-                    char '&' >> return (:&),
-                    char '-' >> return (\e1 e2 -> e1 :& Not e2),
-                    char '|' >> return (:|),
-                    char '~' >> return (:~)] ++
+                  map (return . InfixR . try) basicInfixes ++
                   [[Postfix $ try $ char 'v' >> postfix]] ++
-                  map (return . InfixR . addPostfix . try)
-                   [char 'v' >> lookAhead term >> return (:>),
-                    string "v/" >> lookAhead term >> return (:^),
-                    string "v " >> return (:>),
-                    string "v&" >> return (:&),
-                    string "v⁻" >> return (\e1 e2 -> e1 :& Not e2),
-                    string "v|" >> return (:|),
-                    string "v~" >> return (:~)]
+                  map (return . InfixR . try . (char 'v' >>)) basicInfixes
         postfixes = [sizeConstr,
                      orientationSet,
                      gridSpec,
