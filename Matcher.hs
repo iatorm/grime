@@ -6,6 +6,7 @@ import Data.Map.Strict (Map, empty, lookup, insert)
 import qualified Data.Map.Strict as Map (filter)
 import Data.Set (member)
 import Data.Monoid (Any(Any), getAny, mempty)
+import Data.Maybe (isNothing)
 import Control.Applicative ((<$>), liftA2)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer.Lazy (WriterT, tell, listens, runWriterT)
@@ -48,11 +49,11 @@ f |? g = do
       (NoMatch, NoMatch) -> NoMatch
       _ -> Unknown
 
-anyM :: (Monad m) => [a] -> (a -> m Match) -> m Match
-anyM xs f = foldr (|?) (return NoMatch) $ f <$> xs
+anyMatch :: (Monad m) => [a] -> (a -> m Match) -> m Match
+anyMatch xs f = foldr (|?) (return NoMatch) $ f <$> xs
 
-allM :: (Monad m) => [a] -> (a -> m Match) -> m Match
-allM xs f = foldr (&?) (return Match) $ f <$> xs
+allMatch :: (Monad m) => [a] -> (a -> m Match) -> m Match
+allMatch xs f = foldr (&?) (return Match) $ f <$> xs
 
 filterMatch :: (Monad m) => [a] -> (a -> m Match) -> m [a]
 filterMatch xs p = foldr (\x -> liftA2 (\match -> if match == Match then (x:) else id) $ p x) (return []) xs
@@ -125,10 +126,10 @@ matches (Var rot label) rect = do
       modify $ insert (rect, rot, label) match
       return match
 
-matches (lExp :> rExp) (x, y, w, h) = anyM [0..w] $ \i ->
+matches (lExp :> rExp) (x, y, w, h) = anyMatch [0..w] $ \i ->
   matches lExp (x, y, i, h) &? matches rExp (x+i, y, w-i, h)
           
-matches (dExp :^ uExp) (x, y, w, h) = anyM [0..h] $ \j ->
+matches (dExp :^ uExp) (x, y, w, h) = anyMatch [0..h] $ \j ->
   matches dExp (x, y, w, j) &? matches uExp (x, y+j, w, h-j)
           
 matches (exp1 :| exp2) rect = matches exp1 rect |? matches exp2 rect
@@ -149,11 +150,11 @@ matches (Sized (x1, x2) (y1, y2) expr) r@(x, y, w, h) = do
   let xOk = x1 <= w && case x2 of Nothing -> True; Just x3 -> w <= x3
       yOk = y1 <= h && case y2 of Nothing -> True; Just y3 -> h <= y3
   return (if xOk && yOk then Match else NoMatch) &? case expr of
-    Border -> allMatch
-    AnyChar -> allMatch
-    SomeChar _ _ -> allMatch
+    Border -> allCells
+    AnyChar -> allCells
+    SomeChar _ _ -> allCells
     _ -> matches expr r
-  where allMatch = allM [(x+i, y+j, 1, 1) | i <- [0..w-1], j <- [0..h-1]] $
+  where allCells = allMatch [(x+i, y+j, 1, 1) | i <- [0..w-1], j <- [0..h-1]] $
                    matches expr
 
 matches (Grid (0, _) _ _) (_, _, 0, _) = return Match
@@ -167,21 +168,21 @@ matches (Grid xr@(x1, x2) yr@(y1, y2) expr) r@(x, y, w, h) = go False False 0 0 
           | otherwise = do
               let hMin = case () of
                     _ | x2 == Just (numH + 1) -> x+w
-                      | hOverlap -> hor + 1
+                      | isNothing x2 || hOverlap -> hor + 1
                       | otherwise -> hor
                   vMin = case () of
                     _ | y2 == Just (numV + 1) -> y+h
-                      | vOverlap -> ver + 1
+                      | isNothing y2 || vOverlap -> ver + 1
                       | otherwise -> ver
               hMargin <- filterMatch [hMin .. x+w] $ \newHor ->
-                allM [(hor, v1, newHor-hor, v2-v1) | (v1, v2) <- zip (tail vs) vs] $ matches expr
+                allMatch [(hor, v1, newHor-hor, v2-v1) | (v1, v2) <- zip (tail vs) vs] $ matches expr
               vMargin <- filterMatch [vMin .. y+h] $ \newVer ->
-                allM [(h1, ver, h2-h1, newVer-ver) | (h1, h2) <- zip (tail hs) hs] $ matches expr
+                allMatch [(h1, ver, h2-h1, newVer-ver) | (h1, h2) <- zip (tail hs) hs] $ matches expr
               pairs <- filterMatch [(newH, newV) | numH == numV, newH <- hMargin, newV <- vMargin] $ \(newH, newV) ->
                 matches expr (hor, ver, newH-hor, newV-ver)
-              anyM ([(numH, numV+1, hs, newVer:vs) | numH <= numV, hor == x+w, newVer <- vMargin] ++
-                    [(numH+1, numV, newHor:hs, vs) | numH >= numV, ver == y+h, newHor <- hMargin] ++
-                    [(numH+1, numV+1, newHor:hs, newVer:vs) | (newHor, newVer) <- pairs]) $ \(newNumH, newNumV, newHors, newVers) ->
+              anyMatch ([(numH, numV+1, hs, newVer:vs) | numH <= numV, hor == x+w, newVer <- vMargin] ++
+                        [(numH+1, numV, newHor:hs, vs) | numH >= numV, ver == y+h, newHor <- hMargin] ++
+                        [(numH+1, numV+1, newHor:hs, newVer:vs) | (newHor, newVer) <- pairs]) $ \(newNumH, newNumV, newHors, newVers) ->
                 go (hOverlap || overlap newHors) (vOverlap || overlap newVers) newNumH newNumV newHors newVers
         overlap (a:b:c) = a == b
         overlap _ = False
@@ -211,7 +212,7 @@ matches (InContext expr) r@(x, y, w, h) = do
                                  else ( 0,   maxX',  0,   maxY')
       surrounding = [(x', y', w', h') | x' <- [0..x], y' <- [0..y],
                                         w' <- [w+x-x'..maxX-x'], h' <- [h+y-y'..maxY-y']]
-  withAnchors (r:) $ anyM surrounding $ matches expr
+  withAnchors (r:) $ anyMatch surrounding $ matches expr
 
 matches (Anchor n) r = do
   anchs <- asks anchors
