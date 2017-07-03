@@ -211,7 +211,7 @@ matches (lExp :> rExp) (x, y, w, h) = do
 matches (tExp :^ bExp) (x, y, w, h) = do
   (wsl, hsl) <- sizes tExp
   (wsr, hsr) <- sizes bExp
-  let cuts = Asc.isect hsl . reverse . map (h -) $ takeWhile (<= h) hsl
+  let cuts = Asc.isect hsl . reverse . map (h -) $ takeWhile (<= h) hsr
   if w `Asc.member` Asc.isect wsl wsr
     then anyMatch cuts $ \j -> matches tExp (x, y, w, j) &? matches bExp (x, y+j, w, h-j)
     else return NoMatch
