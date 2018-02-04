@@ -3,7 +3,7 @@ module Matcher where
 import Expression
 import Prelude hiding (lookup)
 import Data.Map.Strict (Map, empty, lookup, insert)
-import qualified Data.Map.Strict as Map (filter)
+import qualified Data.Map.Strict as Map (filter, size)
 import Data.Set (member)
 import Data.Monoid (Any(Any), getAny, mempty)
 import Data.Maybe (isNothing)
@@ -15,10 +15,10 @@ import Control.Monad.Reader (ReaderT, asks, reader, local, runReaderT)
 import Control.Monad.State.Lazy (State, gets, modify, evalState)
 
 -- A fuzzy match
-data Match = Match
-           | NoMatch
+data Match = NoMatch
            | Unknown
-           deriving (Eq,Show)
+           | Match
+           deriving (Eq,Ord,Show)
 
 invert :: Match -> Match
 invert Match = NoMatch
@@ -56,8 +56,16 @@ anyMatch xs f = foldr (|?) (return NoMatch) $ f <$> xs
 allMatch :: (Monad m) => [a] -> (a -> m Match) -> m Match
 allMatch xs f = foldr (&?) (return Match) $ f <$> xs
 
-filterMatch :: (Monad m) => [a] -> (a -> m Match) -> m [a]
-filterMatch xs p = foldr (\x -> liftA2 (\match -> if match == Match then (x:) else id) $ p x) (return []) xs
+-- Keep those that match, signal if any was unknown
+filterMatch :: (Monad m) => [a] -> (a -> m Match) -> m ([a], Bool)
+filterMatch [] _ = return ([], False)
+filterMatch (x : xs) p = do
+  res <- p x
+  (found, unk) <- filterMatch xs p
+  return $ case res of
+    Match   -> (x:found, unk)
+    Unknown -> (found, True)
+    NoMatch -> (found, unk)
 
 -- Sum of two strictly ordered lists
 ascSum :: [Int] -> [Int] -> [Int]
@@ -73,87 +81,98 @@ data Context = Context {size :: Size,
                         matrix :: Map Coord Char,
                         clauses :: Map Label Expr,
                         hasBorders :: Bool,
-                        anchors :: [Rect]}
+                        anchors :: [Rect],
+                        depth :: Int}
             deriving (Show)
 
 -- A monad for performing matching in a matrix
 -- The String is for logging, and the Any for keeping track of new definite matches or non-matches
 type Matcher a = WriterT (String, Any) (ReaderT Context (State Classification)) a
 
--- Modify context anchors
+-- Modify context anchors, increase logging depth
 withAnchors :: ([Rect] -> [Rect]) -> Matcher a -> Matcher a
-withAnchors f = local $ \con -> con{anchors = f $ anchors con}
+withAnchors f = local $ \con -> con{anchors = f $ anchors con, depth = depth con + 1}
 
 -- Helper function for logging
 logMsg :: String -> Matcher ()
-logMsg message = tell (message, mempty)
+logMsg message = do
+  level <- asks depth
+  tell (replicate level ' ' ++ message, mempty)
 
 -- Possible widths and heights of matching rectangles
 -- May give false positives, but never false negatives
 sizes :: Expr -> Matcher ([Int], [Int])
-sizes Border = return ([1], [1])
-sizes Edge = do
-  (maxX, maxY) <- asks size
-  return ([0..maxX+2], [0..maxY+2])
-sizes AnyRect = do
-  (maxX, maxY) <- asks size
-  return ([0..maxX+2], [0..maxY+2])
-sizes AnyChar = return ([1], [1])
-sizes (SomeChar _ _) = return ([1], [1])
-sizes (Var _ _) = do
-  (maxX, maxY) <- asks size
-  return ([0..maxX+2], [0..maxY+2]) -- TODO: implement
-sizes (e1 :> e2) = do
-  (ws1, hs1) <- sizes e1
-  (ws2, hs2) <- sizes e2
-  return (ascSum ws1 ws2, Asc.isect hs1 hs2)
-sizes (e1 :^ e2) = do
-  (ws1, hs1) <- sizes e1
-  (ws2, hs2) <- sizes e2
-  return (Asc.isect ws1 ws2, ascSum hs1 hs2)
-sizes (e1 :| e2) = do
-  (ws1, hs1) <- sizes e1
-  (ws2, hs2) <- sizes e2
-  return (Asc.nub $ Asc.union ws1 ws2, Asc.nub $ Asc.union hs1 hs2)
-sizes (e1 :& e2) = do
-  (ws1, hs1) <- sizes e1
-  (ws2, hs2) <- sizes e2
-  return (Asc.isect ws1 ws2, Asc.isect hs1 hs2)
-sizes (e1 :~ e2) = do
-  (ws1, hs1) <- sizes e1
-  (ws2, hs2) <- sizes e2
-  return (Asc.nub $ Asc.union ws1 ws2, Asc.nub $ Asc.union hs1 hs2)
-sizes (Not _) = do
-  (maxX, maxY) <- asks size
-  return ([0..maxX+2], [0..maxY+2])
-sizes (Sized (x1,x2) (y1,y2) e) = do
-  (maxX, maxY) <- asks size
-  (ws, hs) <- case e of
-    Border -> return ([0..maxX+2], [0..maxY+2])
-    AnyChar -> return ([0..maxX+2], [0..maxY+2])
-    SomeChar _ _ -> return ([0..maxX+2], [0..maxY+2])
-    _ -> sizes e
-  return (Asc.isect ws wRange, Asc.isect hs hRange)
-  where wRange = case x2 of Just high -> [x1..high]
-                            Nothing -> [x1..]
-        hRange = case y2 of Just high -> [y1..high]
-                            Nothing -> [y1..]
-sizes (Grid (x1,x2) (y1,y2) e) = do
-  (maxX, maxY) <- asks size
-  return ([0..maxX+2], [0..maxY+2]) -- TODO: implement
-sizes (Count (low, high) e) = do
-  (maxX, maxY) <- asks size
-  return ([0..maxX+2], [0..maxY+2])
-sizes (InContext e) = do
-  (maxX, maxY) <- asks size
-  return ([0..maxX+2], [0..maxY+2])
-sizes (Anchor n) = do
-  anchors <- asks anchors
-  (maxX, maxY) <- asks size
-  return $ if length anchors > n
-           then let (_, _, w, h) = anchors !! n in ([w], [h])
-           else ([0..maxX+2], [0..maxY+2])
-sizes (Fixed e) = sizes e
+sizes expr = do
+  numVars <- asks $ Map.size . clauses
+  go numVars expr
+  where
+    go :: Int -> Expr -> Matcher ([Int], [Int])
+    go _ Border = return ([1], [1])
+    go _ Edge = do
+      (maxX, maxY) <- asks size
+      return ([0..maxX+2], [0..maxY+2])
+    go _ AnyRect = do
+      (maxX, maxY) <- asks size
+      return ([0..maxX+2], [0..maxY+2])
+    go _ AnyChar = return ([1], [1])
+    go _ (SomeChar _ _) = return ([1], [1])
+    go 0 (Var _ _) = do
+      (maxX, maxY) <- asks size
+      return ([0..maxX+2], [0..maxY+2])
+    go n (Var rot label) = do
+      Just expr <- asks $ lookup label . clauses
+      go (n-1) $ orient expr rot
+    go n (e1 :> e2) = do
+      (ws1, hs1) <- go n e1
+      (ws2, hs2) <- go n e2
+      return (ascSum ws1 ws2, Asc.isect hs1 hs2)
+    go n (e1 :^ e2) = do
+      (ws1, hs1) <- go n e1
+      (ws2, hs2) <- go n e2
+      return (Asc.isect ws1 ws2, ascSum hs1 hs2)
+    go n (e1 :| e2) = do
+      (ws1, hs1) <- go n e1
+      (ws2, hs2) <- go n e2
+      return (Asc.nub $ Asc.union ws1 ws2, Asc.nub $ Asc.union hs1 hs2)
+    go n (e1 :& e2) = do
+      (ws1, hs1) <- go n e1
+      (ws2, hs2) <- go n e2
+      return (Asc.isect ws1 ws2, Asc.isect hs1 hs2)
+    go n (e1 :~ e2) = do
+      (ws1, hs1) <- go n e1
+      (ws2, hs2) <- go n e2
+      return (Asc.nub $ Asc.union ws1 ws2, Asc.nub $ Asc.union hs1 hs2)
+    go _ (Not _) = do
+      (maxX, maxY) <- asks size
+      return ([0..maxX+2], [0..maxY+2])
+    go n (Sized (x1,x2) (y1,y2) e) = do
+      (maxX, maxY) <- asks size
+      (ws, hs) <- case e of
+        Border -> return ([0..maxX+2], [0..maxY+2])
+        AnyChar -> return ([0..maxX+2], [0..maxY+2])
+        SomeChar _ _ -> return ([0..maxX+2], [0..maxY+2])
+        _ -> go n e
+      let wRange = case x2 of Just high -> [x1..high]
+                              Nothing -> [x1..]
+          hRange = case y2 of Just high -> [y1..high]
+                              Nothing -> [y1..]
+      return (Asc.isect ws wRange, Asc.isect hs hRange)
+    go _ (Grid (x1,x2) (y1,y2) e) = do
+      (maxX, maxY) <- asks size
+      return ([0..maxX+2], [0..maxY+2]) -- TODO: implement
+    go _ (Count (low, high) e) = do
+      (maxX, maxY) <- asks size
+      return ([0..maxX+2], [0..maxY+2])
+    go _ (InContext e) = do
+      (maxX, maxY) <- asks size
+      return ([0..maxX+2], [0..maxY+2])
+    go _ (Anchor n) = do
+      anchors <- asks anchors
+      (maxX, maxY) <- asks size
+      return $ if length anchors > n
+               then let (_, _, w, h) = anchors !! n in ([w], [h])
+               else ([0..maxX+2], [0..maxY+2])
+    go n (Fixed e) = go n e
 
 -- Does the pattern match? Update all sub-rectangles as needed
 matches :: Expr -> Rect -> Matcher Match
@@ -189,7 +208,9 @@ matches (SomeChar _ _) _ = return NoMatch
 matches (Var rot label) rect = do
   memoed <- gets $ lookup (rect, rot, label)
   case memoed of
-    Just b -> return b
+    Just b -> do
+      logMsg $ "Lookup   " ++ show rot ++ show label ++ " at " ++ show rect ++ ": " ++ show b ++ "\n"
+      return b
     Nothing -> do
       modify $ insert (rect, rot, label) Unknown
       logMsg $ "Checking " ++ show rot ++ show label ++ " at " ++ show rect ++ "\n"
@@ -248,32 +269,52 @@ matches (Grid xr@(x1, x2) yr@(y1, y2) expr) r@(x, y, w, h) = do
   goWith ws hs
   where goWith widths heights = go False False 0 0 [x] [y]
           where
+            -- Arguments:
+            --  a) Have we placed double vertical lines
+            --  b) Have we placed double horizontal lines
+            --  c) How many vertical lines have we placed
+            --  d) How many horizontal lines have we placed
+            --  e) List of vertical cell borders (reversed)
+            --  f) List of horizontal cell borders (reversed)
             go :: Bool -> Bool -> Int -> Int -> [Int] -> [Int] -> Matcher Match
-            go hOverlap vOverlap numH numV hs@(hor:hors) vs@(ver:vers)
-              | Just n <- x2, numH > n = return NoMatch
-              | Just n <- y2, numV > n = return NoMatch
-              | hor == x + w, ver == y + h, hOverlap || x1 <= numH, vOverlap || y1 <= numV = return Match
+            go vOverlap hOverlap numV numH vs@(ver:vers) hs@(hor:hors)
+              -- More than allowed vertical lines
+              | Just n <- x2, numV > n = return NoMatch
+              -- More than allowed horizontal lines
+              | Just n <- y2, numH > n = return NoMatch
+              -- Reached lower right corner
+              | ver == x + w, hor == y + h, vOverlap || x1 <= numV, hOverlap || y1 <= numH = return Match
+              -- Incomplete grid => extend
               | otherwise = do
-                  let hMin = case () of
-                        _ | x2 == Just (numH + 1) -> x+w
-                          | isNothing x2 || hOverlap -> hor + 1
-                          | otherwise -> hor
-                      hCuts = map (hor +) widths `Asc.isect` [hMin .. x+w]
-                      vMin = case () of
-                        _ | y2 == Just (numV + 1) -> y+h
-                          | isNothing y2 || vOverlap -> ver + 1
+                  let vMin = case () of
+                        -- About to reach upper bound on vertical lines => go to end
+                        _ | x2 == Just (numV + 1) -> x+w
+                        -- No upper bound or already seen overlap => advance at least one cell
+                          | isNothing x2 || vOverlap -> ver + 1
+                        -- Otherwise may stay in place
                           | otherwise -> ver
-                      vCuts = map (ver +) heights `Asc.isect` [vMin .. y+h]
-                  hMargin <- filterMatch hCuts $ \newHor ->
-                    allMatch [(hor, v1, newHor-hor, v2-v1) | (v1, v2) <- zip (tail vs) vs] $ matches expr
-                  vMargin <- filterMatch vCuts $ \newVer ->
-                    allMatch [(h1, ver, h2-h1, newVer-ver) | (h1, h2) <- zip (tail hs) hs] $ matches expr
-                  pairs <- filterMatch [(newH, newV) | numH == numV, newH <- hMargin, newV <- vMargin] $ \(newH, newV) ->
-                    matches expr (hor, ver, newH-hor, newV-ver)
-                  anyMatch ([(numH, numV+1, hs, newVer:vs) | numH <= numV, hor == x+w, newVer <- vMargin] ++
-                            [(numH+1, numV, newHor:hs, vs) | numH >= numV, ver == y+h, newHor <- hMargin] ++
-                            [(numH+1, numV+1, newHor:hs, newVer:vs) | (newHor, newVer) <- pairs]) $ \(newNumH, newNumV, newHors, newVers) ->
-                    go (hOverlap || overlap newHors) (vOverlap || overlap newVers) newNumH newNumV newHors newVers
+                      -- Options for new vertical line
+                      vCuts = map (ver +) widths `Asc.isect` [vMin .. x+w]
+                      hMin = case () of
+                        _ | y2 == Just (numH + 1) -> y+h
+                          | isNothing y2 || hOverlap -> hor + 1
+                          | otherwise -> hor
+                      hCuts = map (hor +) heights `Asc.isect` [hMin .. y+h]
+                  -- Only consider vertical lines that produce matches on the right margin
+                  (vMargin, unkV) <- filterMatch vCuts $ \newVer ->
+                    allMatch [(ver, h1, newVer-ver, h2-h1) | (h1, h2) <- zip (tail hs) hs] $ matches expr
+                  -- Same for bottom margin
+                  (hMargin, unkH) <- filterMatch hCuts $ \newHor ->
+                    allMatch [(v1, hor, v2-v1, newHor-hor) | (v1, v2) <- zip (tail vs) vs] $ matches expr
+                  -- Same for corner rectangle
+                  (pairs, unkP) <- filterMatch [(newV, newH) | numV == numH, newV <- vMargin, newH <- hMargin] $ \(newV, newH) ->
+                    matches expr (ver, hor, newV-ver, newH-hor)
+                  -- Recurse for all possible choices of new lines
+                  found <- anyMatch ([(numV,   numH+1, vs,        newHor:hs) | numV <= numH, ver == x+w, newHor <- hMargin] ++
+                                     [(numV+1, numH,   newVer:vs, hs)        | numV >= numH, hor == y+h, newVer <- vMargin] ++
+                                     [(numV+1, numH+1, newVer:vs, newHor:hs) | (newVer, newHor) <- pairs]) $ \(newNumV, newNumH, newVers, newHors) ->
+                             go (vOverlap || overlap newVers) (hOverlap || overlap newHors) newNumV newNumH newVers newHors
+                  return $ if unkV || unkH || unkP then max Unknown found else found
             overlap (a:b:c) = a == b
             overlap _ = False
 
@@ -327,7 +368,7 @@ matchAllEmpty size hasBorders matrix clauses rects =
   fmap (\(a,(b,_)) -> (a,b)) .
   runWriterT $
   go rects
-  where context = Context {size = size, matrix = matrix, hasBorders = hasBorders, clauses = clauses, anchors = []}
+  where context = Context {size = size, matrix = matrix, hasBorders = hasBorders, clauses = clauses, anchors = [], depth = 0}
         selfAndMatch rect = (,) rect <$> matches (Var (Rot 0) Nothing) rect
         go :: [Rect] -> Matcher [Rect]
         go currRects = do
